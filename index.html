@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Al-Qur'an Digital</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#fcfcfc">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="global-loader" class="global-loader">
+    <div class="spinner"></div>
+    <div class="loader-text" id="loader-text">MEMUAT DATABASE...</div>
+</div>
+
+<div class="app-container">
+    <div id="sheet-overlay" class="sheet-overlay" onclick="closeAllSheets()"></div>
+
+    <div id="home-view" class="view-screen active home-layout">
+        <div class="header-section">
+            <div class="app-top-bar">
+                <h1 class="app-title">Al-Qur'an</h1>
+                <button class="settings-btn" onclick="openSettings()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="quran-tabs">
+                <button class="quran-tab active" onclick="switchMainTab(0)">Surah</button>
+                <button class="quran-tab" onclick="switchMainTab(1)">Halaman</button>
+                <button class="quran-tab" onclick="switchMainTab(2)">Juz</button>
+                <div class="tab-indicator" id="main-tab-indicator"></div>
+            </div>
+        </div>
+
+        <div class="tab-content-container">
+            <div id="pane-0" class="tab-pane active"><div class="list-container" id="surah-list"></div></div>
+            <div id="pane-1" class="tab-pane"><div class="list-container" id="halaman-list"></div></div>
+            <div id="pane-2" class="tab-pane"><div class="list-container" id="juz-list"></div></div>
+        </div>
+    </div>
+
+    <div id="quran-view" class="view-screen">
+        <div class="sticky-wrapper">
+            <div class="quran-header">
+                <button class="back-btn" onclick="closeQuran()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                </button>
+                <h1 id="quran-header-title">Halaman 1</h1>
+                <button class="settings-btn" onclick="openSettings()">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="quran-slider-viewport" id="quran-slider-viewport">
+            <div class="quran-slider-track" id="quran-slider-track"></div>
+        </div>
+
+        <div class="bottom-nav">
+            <button class="nav-btn" id="btn-next-page" onclick="changePage(1)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <div class="page-info-pill" id="page-info-pill">Hal 1</div>
+            <button class="nav-btn" id="btn-prev-page" onclick="changePage(-1)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="bottom-sheet" id="info-sheet">
+        <div class="drag-area" id="info-drag-area"><div class="drag-handle"></div></div>
+        <div class="sheet-content" id="content-settings">
+            <h3 class="sheet-title">Pengaturan Membaca</h3>
+
+            <div class="setting-item">
+                <label for="toggle-perkata">Mode Perkata</label>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-perkata" onchange="updateSettings()">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="setting-item">
+                <label for="toggle-transliterasi">Transliterasi (Latin)</label>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-transliterasi" onchange="updateSettings()">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="setting-item">
+                <label for="select-translation">Terjemahan</label>
+                <select id="select-translation" onchange="updateSettings()" class="custom-select">
+                    <option value="none">Sembunyikan</option>
+                    <option value="id">Indonesia</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label>Ukuran Font Arab</label>
+                <div class="font-controls">
+                    <button class="font-size-btn" onclick="changeFontSize(-0.2)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                    <span id="font-size-display" class="font-size-display">AA</span>
+                    <button class="font-size-btn" onclick="changeFontSize(0.2)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="sql-wasm.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
