@@ -22,6 +22,8 @@
 <div class="app-container">
     <div id="sheet-overlay" class="sheet-overlay" onclick="closeAllSheets()"></div>
 
+    <div id="toast" class="toast">Notifikasi</div>
+
     <div id="home-view" class="view-screen active home-layout">
         <div class="header-section">
             <div class="app-top-bar">
@@ -41,15 +43,33 @@
             </div>
         </div>
 
-        <div class="tab-content-container">
+        <div class="tab-content-container" id="main-tab-swipe-area">
             <div id="pane-0" class="tab-pane active">
                 <div class="search-container">
-                    <input type="text" id="search-surah" placeholder="Cari Nomor atau Nama Surah..." onkeyup="filterSurah()">
+                    <input type="text" id="search-surah" placeholder="Cari Nomor, Nama Arab, atau Terjemahan..." onkeyup="filterSurah()">
                 </div>
                 <div class="list-container" id="surah-list" style="padding-top: 5px;"></div>
             </div>
             <div id="pane-1" class="tab-pane"><div class="list-container" id="juz-list"></div></div>
-            <div id="pane-2" class="tab-pane"><div class="list-container" id="bookmark-list"></div></div>
+            <div id="pane-2" class="tab-pane">
+                <div class="bookmark-header-actions">
+                    <button class="btn-create-folder" onclick="openCreateFolderModal()">+ Buat Folder</button>
+                </div>
+                <div id="bookmark-root-view">
+                    <div class="list-container" id="folder-list" style="padding-bottom: 0;"></div>
+                    <div class="section-title" id="title-semua-bookmark" style="display: none;">Semua Bookmark</div>
+                    <div class="list-container" id="bookmark-list"></div>
+                </div>
+                <div id="bookmark-folder-view" style="display: none;">
+                    <div class="folder-view-header">
+                        <button class="btn-back-folder" onclick="closeFolderView()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg Kembali
+                        </button>
+                        <h3 id="current-folder-name" class="folder-view-title">Nama Folder</h3>
+                    </div>
+                    <div class="list-container" id="folder-content-list"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -74,7 +94,7 @@
             <button class="nav-btn" id="btn-next-page" onclick="changePage(1)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
-            <div class="page-info-pill" id="page-info-pill">Hal 1</div>
+            <button class="page-info-pill interactive" id="page-info-pill" onclick="openGoToPopup()">Hal 1</button>
             <button class="nav-btn" id="btn-prev-page" onclick="changePage(-1)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
             </button>
@@ -86,11 +106,11 @@
                 <div class="verse-popup-subtitle" id="vp-subtitle">Ayat</div>
             </div>
             <div class="verse-popup-actions">
-                <button id="vp-btn-bookmark" class="verse-popup-btn" onclick="togglePopupBookmark()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                <button id="vp-btn-copy" class="verse-popup-btn" onclick="copyVerseText()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 </button>
-                <button class="verse-popup-close" onclick="closeVersePopup()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <button id="vp-btn-bookmark" class="verse-popup-btn" onclick="addBookmark()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                 </button>
             </div>
         </div>
@@ -100,7 +120,6 @@
         <div class="drag-area" id="info-drag-area"><div class="drag-handle"></div></div>
         <div class="sheet-content" id="content-settings">
             <h3 class="sheet-title">Pengaturan Membaca</h3>
-
             <div class="setting-item">
                 <label for="toggle-perkata">Mode Perkata</label>
                 <label class="switch">
@@ -108,7 +127,6 @@
                     <span class="slider round"></span>
                 </label>
             </div>
-
             <div class="setting-item">
                 <label for="toggle-transliterasi">Transliterasi (Latin)</label>
                 <label class="switch">
@@ -116,7 +134,6 @@
                     <span class="slider round"></span>
                 </label>
             </div>
-
             <div class="setting-item">
                 <label for="select-translation">Terjemahan</label>
                 <select id="select-translation" onchange="updateSettings()" class="custom-select">
@@ -125,7 +142,6 @@
                     <option value="en">English</option>
                 </select>
             </div>
-
             <div class="setting-item">
                 <label>Ukuran Font Arab</label>
                 <div class="font-controls">
@@ -137,6 +153,62 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-container" id="goto-modal">
+        <div class="modal-box">
+            <h3 class="modal-title">Pindah Halaman</h3>
+            <div class="goto-grid">
+                <div class="goto-col">
+                    <div class="goto-col-title">Surah</div>
+                    <div class="goto-list" id="goto-list-surah"></div>
+                </div>
+                <div class="goto-col">
+                    <div class="goto-col-title">Ayat</div>
+                    <div class="goto-list" id="goto-list-ayah"></div>
+                </div>
+                <div class="goto-col">
+                    <div class="goto-col-title">Halaman</div>
+                    <div class="goto-list" id="goto-list-page"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeGoToPopup()">Batal</button>
+                <button class="btn-primary" onclick="executeGoTo()">Go To</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-container" id="folder-create-modal">
+        <div class="modal-box">
+            <h3 class="modal-title">Buat Folder Baru</h3>
+            <input type="text" id="input-folder-name" class="modal-input" placeholder="Nama Folder...">
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeFolderModal()">Batal</button>
+                <button class="btn-primary" onclick="executeCreateFolder()">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-container" id="folder-move-modal">
+        <div class="modal-box">
+            <h3 class="modal-title">Pindahkan Bookmark</h3>
+            <div class="move-folder-list" id="move-folder-list"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeMoveModal()">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-container" id="confirm-modal">
+        <div class="modal-box">
+            <h3 class="modal-title" id="confirm-title">Konfirmasi</h3>
+            <p id="confirm-message" style="text-align:center; color:var(--text-muted); margin-bottom:20px; font-size:0.95rem; line-height:1.5;"></p>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeConfirmModal()">Batal</button>
+                <button class="btn-primary" style="background:#ef4444;" onclick="executeConfirmModal()">Hapus</button>
             </div>
         </div>
     </div>
