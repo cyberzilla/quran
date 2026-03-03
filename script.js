@@ -801,7 +801,7 @@ function updateQuranUI() {
         const juzString = Array.from(juzSet).join('-');
 
         headerText = `
-            <span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.1rem;">${surahString}</span>
+            <span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.7rem;">${surahString}</span>
             <span style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-top: 2px;">
                 ${juzString ? 'Juz ' + juzString : ''}
             </span>

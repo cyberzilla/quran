@@ -204,7 +204,7 @@ body {
     font-size: var(--arabic-font-size); color: var(--text-main);
     transition: font-size 0.3s ease, line-height 0.3s ease; min-height: 60vh;
 }
-.quran-page-content.mushaf-mode { line-height: 2.3; text-align: justify; text-align-last: center; direction: rtl; }
+.quran-page-content.mushaf-mode { line-height: 1.7; text-align: justify; text-align-last: center; direction: rtl; }
 .quran-page-content.list-mode { text-align: right; direction: ltr; padding: 20px 15px; }
 
 /* Smooth Global Font Transitions */
