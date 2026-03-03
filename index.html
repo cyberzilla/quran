@@ -35,16 +35,21 @@
             </div>
             <div class="quran-tabs">
                 <button class="quran-tab active" onclick="switchMainTab(0)">Surah</button>
-                <button class="quran-tab" onclick="switchMainTab(1)">Halaman</button>
-                <button class="quran-tab" onclick="switchMainTab(2)">Juz</button>
+                <button class="quran-tab" onclick="switchMainTab(1)">Juz</button>
+                <button class="quran-tab" onclick="switchMainTab(2)">Bookmark</button>
                 <div class="tab-indicator" id="main-tab-indicator"></div>
             </div>
         </div>
 
         <div class="tab-content-container">
-            <div id="pane-0" class="tab-pane active"><div class="list-container" id="surah-list"></div></div>
-            <div id="pane-1" class="tab-pane"><div class="list-container" id="halaman-list"></div></div>
-            <div id="pane-2" class="tab-pane"><div class="list-container" id="juz-list"></div></div>
+            <div id="pane-0" class="tab-pane active">
+                <div class="search-container">
+                    <input type="text" id="search-surah" placeholder="Cari Nomor atau Nama Surah..." onkeyup="filterSurah()">
+                </div>
+                <div class="list-container" id="surah-list" style="padding-top: 5px;"></div>
+            </div>
+            <div id="pane-1" class="tab-pane"><div class="list-container" id="juz-list"></div></div>
+            <div id="pane-2" class="tab-pane"><div class="list-container" id="bookmark-list"></div></div>
         </div>
     </div>
 
@@ -73,6 +78,21 @@
             <button class="nav-btn" id="btn-prev-page" onclick="changePage(-1)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
             </button>
+        </div>
+
+        <div id="verse-popup" class="verse-popup">
+            <div class="verse-popup-info">
+                <div class="verse-popup-title" id="vp-title">Surah</div>
+                <div class="verse-popup-subtitle" id="vp-subtitle">Ayat</div>
+            </div>
+            <div class="verse-popup-actions">
+                <button id="vp-btn-bookmark" class="verse-popup-btn" onclick="togglePopupBookmark()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                </button>
+                <button class="verse-popup-close" onclick="closeVersePopup()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
         </div>
     </div>
 
