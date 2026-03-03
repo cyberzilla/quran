@@ -12,6 +12,8 @@ let currentActiveTab = 0;
 let quranTrackInitialized = false;
 let isDragging = false;
 let startX = 0;
+let appBookmarks = [];
+let activeVerseData = null;
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -23,10 +25,39 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+function loadBookmarks() {
+    try {
+        appBookmarks = JSON.parse(localStorage.getItem('quran_bookmarks') || '[]');
+    } catch(e) {
+        appBookmarks = [];
+    }
+}
+
+function saveBookmarks() {
+    localStorage.setItem('quran_bookmarks', JSON.stringify(appBookmarks));
+}
+
+function toggleBookmark(surahId, verseId, pageNumber, surahNameLatin) {
+    const index = appBookmarks.findIndex(b => b.surahId === surahId && b.verseId === verseId);
+    if (index > -1) {
+        appBookmarks.splice(index, 1);
+    } else {
+        appBookmarks.push({
+            surahId: surahId,
+            verseId: verseId,
+            pageNumber: pageNumber,
+            surahName: surahNameLatin,
+            timestamp: new Date().getTime()
+        });
+    }
+    saveBookmarks();
+    renderBookmarkList();
+}
+
 async function initApp() {
     loadSettings();
+    loadBookmarks();
     const loaderText = document.getElementById('loader-text');
-
     const isDbDownloaded = localStorage.getItem('is_db_downloaded');
 
     try {
@@ -55,7 +86,7 @@ async function initApp() {
         }
 
         renderSurahList();
-        renderHalamanList();
+        renderBookmarkList();
         renderJuzList();
         setupSheetDrag('info-sheet', 'info-drag-area');
 
@@ -122,7 +153,6 @@ function renderSurahList() {
     const container = document.getElementById('surah-list');
     if (!container) return;
 
-    // Mengambil name_latin juga dari database
     const surahData = execQuery("SELECT * FROM surah ORDER BY id ASC");
 
     let html = '';
@@ -130,14 +160,12 @@ function renderSurahList() {
         const pageQuery = execQuery(`SELECT page_number FROM verses WHERE surah_number = ${surah.id} LIMIT 1`);
         const startPage = pageQuery.length > 0 ? pageQuery[0].page_number : 1;
 
-        const translationText = surah.name_id ? ` <span style="font-weight: normal; font-size: 0.85em;">(${surah.name_id})</span>` : '';
-
         html += `
-            <div class="list-item" onclick="openQuranPage(${startPage})">
+            <div class="list-item surah-item" onclick="openQuranPage(${startPage})" data-id="${surah.id}" data-name="${surah.name_latin.toLowerCase()}">
                 <div class="item-number">${surah.id}</div>
                 <div class="item-info">
-                    <div class="item-title">${surah.name_latin}${translationText}</div>
-                    <div class="item-subtitle">${surah.location} • ${surah.verses_count} Ayat</div>
+                    <div class="item-title">${surah.name_latin}</div>
+                    <div class="item-subtitle">${surah.name_id}</div>
                 </div>
                 <div class="item-arabic">${surah.name_ar}</div>
             </div>
@@ -146,19 +174,46 @@ function renderSurahList() {
     container.innerHTML = html;
 }
 
-function renderHalamanList() {
-    const container = document.getElementById('halaman-list');
+function filterSurah() {
+    const keyword = document.getElementById('search-surah').value.toLowerCase();
+    const items = document.querySelectorAll('.surah-item');
+    items.forEach(item => {
+        const id = item.getAttribute('data-id');
+        const name = item.getAttribute('data-name');
+        if (id.includes(keyword) || name.includes(keyword)) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+function renderBookmarkList() {
+    const container = document.getElementById('bookmark-list');
     if (!container) return;
 
+    if (appBookmarks.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted);">Belum ada ayat yang disimpan.</div>';
+        return;
+    }
+
+    appBookmarks.sort((a, b) => b.timestamp - a.timestamp);
+
     let html = '';
-    for (let i = 1; i <= 604; i++) {
+    appBookmarks.forEach(bm => {
         html += `
-            <div class="list-item" onclick="openQuranPage(${i})">
-                <div class="item-number" style="font-size: 0.8rem;">Hal</div>
-                <div class="item-info"><div class="item-title">Halaman ${i}</div></div>
+            <div class="list-item" onclick="openQuranPage(${bm.pageNumber})">
+                <div class="item-number" style="font-size: 0.8rem;">Hal<br>${bm.pageNumber}</div>
+                <div class="item-info">
+                    <div class="item-title">${bm.surahName}</div>
+                    <div class="item-subtitle">Ayat ${bm.verseId}</div>
+                </div>
+                <button class="bookmark-btn bookmarked" onclick="event.stopPropagation(); toggleBookmark(${bm.surahId}, ${bm.verseId}, ${bm.pageNumber}, '${bm.surahName.replace(/'/g, "\\'")}')" style="margin-left: auto;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                </button>
             </div>
         `;
-    }
+    });
     container.innerHTML = html;
 }
 
@@ -166,20 +221,32 @@ function renderJuzList() {
     const container = document.getElementById('juz-list');
     if (!container) return;
 
-    const juzStartPages = [
-        1, 22, 42, 62, 82, 102, 121, 142, 162, 182, 201, 222, 242, 262, 282,
-        302, 322, 342, 362, 382, 402, 422, 442, 462, 482, 502, 522, 542, 562, 582
-    ];
-
     let html = '';
     for (let i = 1; i <= 30; i++) {
-        const startPage = juzStartPages[i - 1];
+        const juzQuery = execQuery(`
+            SELECT v.page_number, v.surah_number, v.verse_number, s.name_latin
+            FROM verses v
+                     LEFT JOIN surah s ON v.surah_number = s.id
+            WHERE v.juz_number = ${i}
+            ORDER BY v.id ASC LIMIT 1
+        `);
+
+        let startPage = 1;
+        let surahName = "";
+        let verseNumber = 1;
+
+        if (juzQuery.length > 0) {
+            startPage = juzQuery[0].page_number;
+            surahName = juzQuery[0].name_latin;
+            verseNumber = juzQuery[0].verse_number;
+        }
+
         html += `
             <div class="list-item" onclick="openQuranPage(${startPage})">
-                <div class="item-number" style="font-size: 0.8rem;">Juz</div>
+                <div class="item-number" style="font-size: 0.8rem;">Juz<br>${i}</div>
                 <div class="item-info">
                     <div class="item-title">Juz ${i}</div>
-                    <div class="item-subtitle">Mulai Halaman ${startPage}</div>
+                    <div class="item-subtitle">${surahName} • Ayat ${verseNumber}</div>
                 </div>
             </div>
         `;
@@ -209,13 +276,57 @@ function initQuranTrack() {
     setupQuranTouchEvents();
 }
 
+// Fungsi Event Klik pada Ayat
+function handleVerseClick(surahId, verseId, pageNumber, surahName, element) {
+    document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
+    element.classList.add('highlighted');
+
+    activeVerseData = { surahId, verseId, pageNumber, surahName };
+
+    const titleEl = document.getElementById('vp-title');
+    const subtitleEl = document.getElementById('vp-subtitle');
+    if(titleEl) titleEl.innerText = surahName;
+    if(subtitleEl) subtitleEl.innerText = `Ayat ${verseId}`;
+
+    updatePopupBookmarkIcon(surahId, verseId);
+
+    const popup = document.getElementById('verse-popup');
+    if(popup) popup.classList.add('active');
+}
+
+function updatePopupBookmarkIcon(surahId, verseId) {
+    const isBookmarked = appBookmarks.some(b => b.surahId === surahId && b.verseId === verseId);
+    const bmBtn = document.getElementById('vp-btn-bookmark');
+    if(!bmBtn) return;
+
+    if(isBookmarked) {
+        bmBtn.classList.add('bookmarked');
+        bmBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`;
+    } else {
+        bmBtn.classList.remove('bookmarked');
+        bmBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`;
+    }
+}
+
+function togglePopupBookmark() {
+    if(!activeVerseData) return;
+    toggleBookmark(activeVerseData.surahId, activeVerseData.verseId, activeVerseData.pageNumber, activeVerseData.surahName);
+    updatePopupBookmarkIcon(activeVerseData.surahId, activeVerseData.verseId);
+}
+
+function closeVersePopup() {
+    const popup = document.getElementById('verse-popup');
+    if(popup) popup.classList.remove('active');
+    document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
+    activeVerseData = null;
+}
+
 function renderPageContent(pageNumber, forceRender = false) {
     if (pageNumber < 1 || pageNumber > 604 || !db) return;
     const container = document.querySelector(`#quran-page-${pageNumber} .quran-page-content`);
     if (!container) return;
     if (container.dataset.loaded === "true" && !forceRender) return;
 
-    // Tambahkan name_latin dalam list query JOIN
     const verses = execQuery(`
         SELECT v.*, s.name_ar, s.name_latin, s.name_id, s.location, s.verses_count
         FROM verses v
@@ -241,7 +352,6 @@ function renderPageContent(pageNumber, forceRender = false) {
     let html = '';
 
     verses.forEach(v => {
-        // --- RENDER HEADER SURAH ---
         if (v.verse_number === 1) {
             const translationText = v.name_id ? ` <span style="font-weight: normal; font-size: 0.85em;">(${v.name_id})</span>` : '';
             html += `
@@ -268,10 +378,12 @@ function renderPageContent(pageNumber, forceRender = false) {
             });
         }
 
+        const safeSurahName = v.name_latin.replace(/'/g, "\\'");
+
         if (isMushafMode) {
-            html += `<span class="verse-word">${fullArabicText}</span><span class="verse-end">۝${toArabicNumber(v.verse_number)}</span> `;
+            html += `<span class="verse-mushaf-wrap" onclick="handleVerseClick(${v.surah_number}, ${v.verse_number}, ${pageNumber}, '${safeSurahName}', this)"><span class="verse-word">${fullArabicText}</span><span class="verse-end">۝${toArabicNumber(v.verse_number)}</span></span> `;
         } else {
-            html += `<div class="verse-container" id="verse-${v.id}">`;
+            html += `<div class="verse-container" id="verse-${v.id}" onclick="handleVerseClick(${v.surah_number}, ${v.verse_number}, ${pageNumber}, '${safeSurahName}', this)">`;
 
             if (appSettings.wordByWord) {
                 html += `<div class="wbw-container">`;
@@ -381,7 +493,6 @@ function updateQuranUI() {
             const minVerse = Math.min(...versesInSurah);
             const maxVerse = Math.max(...versesInSurah);
 
-            // Fetch name_latin instead of name_id for the header
             const surahInfo = execQuery(`SELECT name_latin FROM surah WHERE id = ${surahId}`);
             const surahName = surahInfo.length > 0 ? surahInfo[0].name_latin : `Surah ${surahId}`;
 
@@ -428,6 +539,7 @@ function updateQuranUI() {
 function changePage(delta) {
     let newPage = currentPage + delta;
     if (newPage >= 1 && newPage <= 604) {
+        closeVersePopup(); // Tutup popup saat ganti halaman
         currentPage = newPage;
         localStorage.setItem('quran_last_page', currentPage);
 
@@ -513,6 +625,7 @@ function setupQuranTouchEvents() {
 }
 
 function closeQuran() {
+    closeVersePopup(); // Tutup popup saat keluar dari bacaan
     document.getElementById('quran-view').classList.remove('active');
     document.getElementById('home-view').classList.add('active');
     closeAllSheets();
@@ -536,25 +649,6 @@ function checkOverlay() {
         if (isExp) overlay.classList.add('active');
         else overlay.classList.remove('active');
     }
-}
-
-function loadSettings() {
-    const saved = localStorage.getItem('quran_settings');
-    if (saved) appSettings = Object.assign(appSettings, JSON.parse(saved));
-
-    const fontSelect = document.getElementById('font-select');
-    if (fontSelect) fontSelect.value = appSettings.font;
-
-    const togglePerkata = document.getElementById('toggle-perkata');
-    if (togglePerkata) togglePerkata.checked = appSettings.wordByWord;
-
-    const toggleTransliterasi = document.getElementById('toggle-transliterasi');
-    if (toggleTransliterasi) toggleTransliterasi.checked = appSettings.showTransliteration;
-
-    const selectTranslation = document.getElementById('select-translation');
-    if (selectTranslation) selectTranslation.value = appSettings.translationLang;
-
-    applySettings();
 }
 
 function updateSettings() {
@@ -581,6 +675,25 @@ function updateSettings() {
         renderPageContent(currentPage - 1, true);
         renderPageContent(currentPage + 1, true);
     }
+}
+
+function loadSettings() {
+    const saved = localStorage.getItem('quran_settings');
+    if (saved) appSettings = Object.assign(appSettings, JSON.parse(saved));
+
+    const fontSelect = document.getElementById('font-select');
+    if (fontSelect) fontSelect.value = appSettings.font;
+
+    const togglePerkata = document.getElementById('toggle-perkata');
+    if (togglePerkata) togglePerkata.checked = appSettings.wordByWord;
+
+    const toggleTransliterasi = document.getElementById('toggle-transliterasi');
+    if (toggleTransliterasi) toggleTransliterasi.checked = appSettings.showTransliteration;
+
+    const selectTranslation = document.getElementById('select-translation');
+    if (selectTranslation) selectTranslation.value = appSettings.translationLang;
+
+    applySettings();
 }
 
 function changeFontSize(step) {
