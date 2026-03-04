@@ -63,7 +63,7 @@
                 <div id="bookmark-folder-view" style="display: none;">
                     <div class="folder-view-header">
                         <button class="btn-back-folder" onclick="closeFolderView()">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg Kembali
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                         </button>
                         <h3 id="current-folder-name" class="folder-view-title">Nama Folder</h3>
                     </div>
@@ -209,6 +209,17 @@
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeConfirmModal()">Batal</button>
                 <button class="btn-primary" style="background:#ef4444;" onclick="executeConfirmModal()">Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-container" id="surah-info-modal">
+        <div class="modal-box" style="display: flex; flex-direction: column; max-height: 85vh; padding: 20px 20px 15px 20px;">
+            <h3 class="modal-title" id="surah-info-title">Informasi Surah</h3>
+            <div id="surah-info-content" style="flex: 1; overflow-y: auto; text-align: justify; font-size: 0.95rem; line-height: 1.6; color: var(--text-main); margin-bottom: 15px; padding-right: 5px;">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" style="width: 100%;" onclick="closeSurahInfoModal()">Tutup</button>
             </div>
         </div>
     </div>

@@ -1,6 +1,6 @@
 let appSettings = {
     font: 'omar',
-    arabicSize: 2.25,
+    arabicSize: 1.85,
     wordByWord: false,
     showTransliteration: false,
     translationLang: 'none'
@@ -579,10 +579,8 @@ function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, t
     const popup = document.getElementById('verse-popup');
     const isPopupActive = popup.classList.contains('active');
 
-    // Cek apakah elemen ini yang sedang disorot (untuk toggle matikan/nyalakan)
     if(element.classList.contains('highlighted') && window._currentClickAction == null) {
         if (!isPopupActive) {
-            // Popup sedang mati tapi elemen terseleksi (misal masuk dari bookmark), nyalakan popup
             activeVerseData = { surahId, verseId, pageNumber, surahName, arabicText, translationText };
             const titleEl = document.getElementById('vp-title');
             const subtitleEl = document.getElementById('vp-subtitle');
@@ -591,24 +589,20 @@ function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, t
             popup.classList.add('active');
             return;
         } else {
-            // Toggle MATIKAN seleksi dan tutup popup
             element.classList.remove('highlighted');
             closeVersePopup();
             return;
         }
     }
 
-    // Eksekusi Normal (Elemen belum disorot, atau pindah klik ke ayat lain)
     document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
     element.classList.add('highlighted');
 
     activeVerseData = { surahId, verseId, pageNumber, surahName, arabicText, translationText };
 
     if (window._currentClickAction === 'bookmark') {
-        // Jika asalnya dari klik bookmark -> jangan munculkan popup
         closeVersePopup();
     } else {
-        // Asal klik normal atau GoTo -> Munculkan popup
         const titleEl = document.getElementById('vp-title');
         const subtitleEl = document.getElementById('vp-subtitle');
         if(titleEl) titleEl.innerText = surahName;
@@ -634,6 +628,27 @@ function closeVersePopup() {
     const popup = document.getElementById('verse-popup');
     if(popup) popup.classList.remove('active');
     activeVerseData = null;
+}
+
+/* Fungsi Modal Informasi Surah */
+function openSurahInfoModal(surahId) {
+    // MENCEGAH MODAL TERBUKA KETIKA HALAMAN SEDANG DIGESER (SWIPE)
+    if (preventNextClick) return;
+
+    const data = execQuery(`SELECT name_latin, name_id, long_desc FROM surah WHERE id=${surahId}`);
+    if(data.length > 0) {
+        const s = data[0];
+        document.getElementById('surah-info-title').innerText = `${s.name_latin} (${s.name_id})`;
+
+        let desc = s.long_desc ? s.long_desc.replace(/\n/g, '<br><br>') : 'Informasi detail untuk surah ini belum tersedia.';
+
+        document.getElementById('surah-info-content').innerHTML = desc;
+        document.getElementById('surah-info-modal').classList.add('active');
+    }
+}
+
+function closeSurahInfoModal() {
+    document.getElementById('surah-info-modal').classList.remove('active');
 }
 
 function renderPageContent(pageNumber, forceRender = false) {
@@ -667,13 +682,13 @@ function renderPageContent(pageNumber, forceRender = false) {
     let html = '';
     verses.forEach(v => {
         if (v.verse_number === 1) {
-            const translationTextInfo = v.name_id ? ` <span style="font-weight: normal; font-size: 0.85em;">(${v.name_id})</span>` : '';
             html += `
-                <div class="surah-header-separator">
+                <div class="surah-header-separator" onclick="openSurahInfoModal(${v.surah_number})">
                     <div class="surah-col-left">${v.verses_count}<br>Ayat</div>
                     <div class="surah-col-center">
                         <div class="surah-name-ar">${v.name_ar}</div>
-                        <div class="surah-name-id">${v.name_latin}${translationTextInfo}</div>
+                        <div class="surah-name-latin">${v.name_latin}</div>
+                        <div class="surah-name-translation">${v.name_id}</div>
                     </div>
                     <div class="surah-col-right">${v.location}</div>
                 </div>
@@ -879,11 +894,9 @@ function setupQuranTouchEvents() {
         const currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
         const diffX = currentX - startX, diffY = currentY - startY;
 
-        // Jika terdeteksi gesekan (bukan sekedar tap meleset sedikit)
         if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
             if (!globalIsDragging) {
                 globalIsDragging = true;
-                // Tutup popup secara instan hanya ketika benar-benar digeser
                 closeVersePopup();
                 document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
             }
@@ -892,7 +905,7 @@ function setupQuranTouchEvents() {
         if (isScrolling === null) {
             if (Math.abs(diffX) > 3 || Math.abs(diffY) > 3) isScrolling = Math.abs(diffY) > Math.abs(diffX);
         }
-        if (isScrolling) return; // kalau gulir atas bawah jangan geser slider horizontal
+        if (isScrolling) return;
 
         if (e.cancelable) e.preventDefault();
 
@@ -907,7 +920,6 @@ function setupQuranTouchEvents() {
         if (!isDragging) return;
         isDragging = false;
 
-        // Mencegah tap tidak sengaja memunculkan popup kalau baru saja menggeser halaman
         if (globalIsDragging) {
             preventNextClick = true;
             setTimeout(() => preventNextClick = false, 300);

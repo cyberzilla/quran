@@ -1,13 +1,17 @@
-const CACHE_NAME = 'quran-pwa-v1';
+const CACHE_NAME = 'quran-pwa-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './style.css',
     './script.js',
     './manifest.json',
+    './icon-192.png',
     './quran.sqlite', // File database SQLite
     './sql-wasm.js',
-    './sql-wasm.wasm'
+    './sql-wasm.wasm',
+    './omar.woff2',
+    './inter-regular.woff2',
+    './inter-semibold.woff2'
 ];
 
 // Install Event: Menyimpan semua aset awal ke Cache
