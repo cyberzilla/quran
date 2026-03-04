@@ -88,13 +88,13 @@ function addBookmark() {
         surahName: activeVerseData.surahName,
         folderId: currentViewingFolderId || null,
         timestamp: new Date().getTime(),
-        deleted: false
+        deleted: false // Set explicitly for new bookmarks
     });
 
     saveBookmarks();
 
     if (currentViewingFolderId) {
-        const folder = appFolders.find(f => f.id === currentViewingFolderId);
+        const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
         if (folder) openFolderView(folder.id, folder.name);
     } else {
         renderBookmarkTab();
@@ -111,18 +111,19 @@ function promptRemoveBookmark(id) {
     });
 }
 
-// PERUBAHAN: Soft Delete untuk Bookmark
+// LOGIKA BARU: Soft Delete Bookmark (Mekanisme Tombstone)
 function removeBookmark(id) {
     const index = appBookmarks.findIndex(b => b.id === id);
     if (index > -1) {
         appBookmarks[index].deleted = true;
-        appBookmarks[index].timestamp = new Date().getTime(); // Update waktu agar menimpa data di Drive
+        appBookmarks[index].timestamp = new Date().getTime(); // Update timestamp agar cloud ikut hapus
     }
 
     saveBookmarks();
     if (currentViewingFolderId) {
-        const folder = appFolders.find(f => f.id === currentViewingFolderId);
+        const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
         if (folder) openFolderView(folder.id, folder.name);
+        else closeFolderView();
     } else {
         renderBookmarkTab();
     }
@@ -133,6 +134,7 @@ async function initApp() {
     loadSettings();
     loadBookmarks();
     initGoogleSync();
+
     const loaderText = document.getElementById('loader-text');
     const isDbDownloaded = localStorage.getItem('is_db_downloaded');
 
@@ -293,35 +295,45 @@ function moveFolder(id, dir) {
         const temp = appFolders[fIndex];
         appFolders[fIndex] = appFolders[targetIndex];
         appFolders[targetIndex] = temp;
+
+        const now = new Date().getTime();
+        appFolders[fIndex].timestamp = now;
+        appFolders[targetIndex].timestamp = now;
+
         saveBookmarks();
         renderBookmarkTab();
     }
 }
 
+// LOGIKA BARU: Pesan Konfirmasi Hapus Folder
 function promptDeleteFolder(id) {
-    showConfirm("Hapus Folder", "Apakah Anda yakin ingin menghapus folder ini? (Bookmark di dalamnya akan dipindahkan ke luar folder)", () => {
+    showConfirm("Hapus Folder", "Apakah Anda yakin ingin menghapus folder ini beserta seluruh bookmark di dalamnya?", () => {
         deleteFolder(id);
     });
 }
 
-// PERUBAHAN: Soft Delete untuk Folder
+// LOGIKA BARU: Soft Delete Folder beserta Isinya
 function deleteFolder(id) {
+    const now = new Date().getTime();
+
+    // Hapus semua bookmark di dalam folder ini (soft delete)
     appBookmarks.forEach(b => {
         if (b.folderId === id) {
-            b.folderId = null;
-            b.timestamp = new Date().getTime(); // Update timestamp perpindahan folder
+            b.deleted = true;
+            b.timestamp = now;
         }
     });
 
+    // Hapus foldernya (soft delete)
     const index = appFolders.findIndex(f => f.id === id);
     if (index > -1) {
         appFolders[index].deleted = true;
-        appFolders[index].timestamp = new Date().getTime(); // Update waktu folder dihapus
+        appFolders[index].timestamp = now;
     }
 
     saveBookmarks();
     renderBookmarkTab();
-    showToast("Folder berhasil dihapus");
+    showToast("Folder beserta isinya berhasil dihapus");
 }
 
 function moveBookmark(id, dir) {
@@ -345,17 +357,23 @@ function moveBookmark(id, dir) {
         const temp = appBookmarks[bmIndex];
         appBookmarks[bmIndex] = appBookmarks[targetIndex];
         appBookmarks[targetIndex] = temp;
+
+        const now = new Date().getTime();
+        appBookmarks[bmIndex].timestamp = now;
+        appBookmarks[targetIndex].timestamp = now;
+
         saveBookmarks();
         if (currentViewingFolderId) {
-            const folder = appFolders.find(f => f.id === currentViewingFolderId);
+            const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
             if (folder) openFolderView(folder.id, folder.name);
+            else closeFolderView();
         } else {
             renderBookmarkTab();
         }
     }
 }
 
-// PERUBAHAN: Filter Data yang 'deleted' agar tidak tampil
+// LOGIKA BARU: Filter render untuk tidak menampilkan data "deleted: true"
 function renderBookmarkTab() {
     const folderList = document.getElementById('folder-list');
     const bookmarkList = document.getElementById('bookmark-list');
@@ -363,8 +381,9 @@ function renderBookmarkTab() {
     if(!folderList || !bookmarkList) return;
 
     let folderHtml = '';
-    // Hanya render folder yang tidak dihapus
-    appFolders.filter(f => !f.deleted).forEach(folder => {
+    const visibleFolders = appFolders.filter(f => !f.deleted);
+
+    visibleFolders.forEach(folder => {
         const count = appBookmarks.filter(b => b.folderId === folder.id && !b.deleted).length;
         folderHtml += `
             <div class="list-item folder-item" onclick="openFolderView('${folder.id}', '${folder.name}')">
@@ -393,9 +412,7 @@ function renderBookmarkTab() {
     });
     folderList.innerHTML = folderHtml;
 
-    // Hanya tampilkan bookmark root yang tidak dihapus
     const rootBookmarks = appBookmarks.filter(b => !b.folderId && !b.deleted);
-    const visibleFolders = appFolders.filter(f => !f.deleted);
 
     if(rootBookmarks.length > 0 || visibleFolders.length > 0) {
         titleSemua.style.display = 'block';
@@ -463,25 +480,29 @@ function openMoveModal(bookmarkId) {
     if(!bookmarkToMove) return;
     const list = document.getElementById('move-folder-list');
     let html = `<div class="move-folder-item" onclick="executeMoveBookmark(null)">-- Tanpa Folder (Root) --</div>`;
-    // Hanya tampilkan folder yang tidak dihapus
+
+    // Hanya tampilkan folder yg tidak didelete
     appFolders.filter(f => !f.deleted).forEach(f => {
         html += `<div class="move-folder-item" onclick="executeMoveBookmark('${f.id}')">📁 ${f.name}</div>`;
     });
     list.innerHTML = html;
     document.getElementById('folder-move-modal').classList.add('active');
 }
+
 function closeMoveModal() {
     document.getElementById('folder-move-modal').classList.remove('active');
     bookmarkToMove = null;
 }
+
 function executeMoveBookmark(folderId) {
     if(bookmarkToMove) {
         bookmarkToMove.folderId = folderId;
-        bookmarkToMove.timestamp = new Date().getTime(); // Update timestamp karena terjadi perubahan
+        bookmarkToMove.timestamp = new Date().getTime(); // Update timestamp agar sync sinkron
         saveBookmarks();
         if (currentViewingFolderId) {
-            const folder = appFolders.find(f => f.id === currentViewingFolderId);
+            const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
             if (folder) openFolderView(folder.id, folder.name);
+            else closeFolderView();
         } else {
             renderBookmarkTab();
         }
@@ -498,7 +519,6 @@ function openFolderView(folderId, folderName) {
     document.querySelector('.bookmark-header-actions').style.display = 'none';
 
     const container = document.getElementById('folder-content-list');
-    // Hanya tampilkan bookmark di folder ini yang tidak dihapus
     const folderBookmarks = appBookmarks.filter(b => b.folderId === folderId && !b.deleted);
 
     if(folderBookmarks.length === 0) {
@@ -548,7 +568,7 @@ function closeFolderView() {
     currentViewingFolderId = null;
     document.getElementById('bookmark-root-view').style.display = 'block';
     document.getElementById('bookmark-folder-view').style.display = 'none';
-    document.querySelector('.bookmark-header-actions').style.display = 'block';
+    document.querySelector('.bookmark-header-actions').style.display = 'flex';
     renderBookmarkTab();
 }
 
@@ -1202,9 +1222,8 @@ window.addEventListener('resize', () => {
 
 document.addEventListener('DOMContentLoaded', initApp);
 
-
 /* =========================================
-   GOOGLE DRIVE SYNC LOGIC (WITH UI INFO)
+   GOOGLE DRIVE SYNC LOGIC (TOMBSTONE MERGE)
 ========================================= */
 let driveAccessToken = '';
 let tokenClient;
@@ -1219,14 +1238,12 @@ function initGoogleSync() {
     tokenClient = google.accounts.oauth2.initTokenClient({
         // GANTI DENGAN CLIENT ID ANDA
         client_id: '219268814398-2lsp4fspvpat7quoc7jq6qe9jpi13c1g.apps.googleusercontent.com',
-        // Tambahkan scope userinfo.email untuk bisa mengambil email pengguna
         scope: 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email',
         callback: (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
                 driveAccessToken = tokenResponse.access_token;
                 localStorage.setItem('quran_gdrive_linked', 'true');
 
-                // Ambil info email pengguna di background
                 fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                     headers: { 'Authorization': 'Bearer ' + driveAccessToken }
                 })
@@ -1248,7 +1265,6 @@ function initGoogleSync() {
     updateSyncButtonUI();
 }
 
-// PERBARUAN: Menampilkan Info Email & Waktu Terakhir Sync
 function updateSyncButtonUI() {
     const btn = document.getElementById('btn-sync-drive');
     const infoContainer = document.getElementById('sync-info-container');
@@ -1260,7 +1276,7 @@ function updateSyncButtonUI() {
     const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
     if (isLinked) {
         btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg> Sinkronisasi`;
-        btn.style.backgroundColor = '#10b981'; // Warna Hijau
+        btn.style.backgroundColor = '#10b981';
 
         if (infoContainer) {
             infoContainer.style.display = 'block';
@@ -1318,23 +1334,21 @@ async function performSync() {
             }
         }
 
-        // Additive Merge (Drive prioritas)
-        appBookmarks = mergeAdditive(appBookmarks, remoteData.bookmarks || []);
-        appFolders = mergeAdditive(appFolders, remoteData.folders || []);
+        // Panggil fungsi Penggabungan berbasis Timestamp
+        appBookmarks = mergeSyncData(appBookmarks, remoteData.bookmarks || []);
+        appFolders = mergeSyncData(appFolders, remoteData.folders || []);
 
         saveBookmarks();
         renderBookmarkTab();
 
         if (currentViewingFolderId) {
-            const folder = appFolders.find(f => f.id === currentViewingFolderId);
+            const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
             if (folder) openFolderView(folder.id, folder.name);
             else closeFolderView();
         }
 
-        // Unggah kombinasi terbaru
         await uploadToDriveRobust({ bookmarks: appBookmarks, folders: appFolders });
 
-        // Simpan Waktu Terakhir Berhasil Sync
         const now = new Date();
         const timeString = now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
         localStorage.setItem('quran_last_sync', timeString);
@@ -1347,14 +1361,32 @@ async function performSync() {
     }
 }
 
-function mergeAdditive(localArr, remoteArr) {
+// LOGIKA BARU: Merge berbasis TIMESTAMP ("Yang paling baru menang")
+// Mekanisme ini memastikan antara pengguna Clear Cache dan Hapus Data bisa dibedakan.
+function mergeSyncData(localArr, remoteArr) {
     const map = new Map();
+
+    // 1. Daftarkan semua data dari Drive ke peta
     remoteArr.forEach(item => map.set(item.id, item));
+
+    // 2. Bandingkan dengan data Lokal di HP
     localArr.forEach(item => {
-        if (!map.has(item.id)) {
+        if (map.has(item.id)) {
+            const existingItem = map.get(item.id);
+            const existingTime = existingItem.timestamp || 0;
+            const localTime = item.timestamp || 0;
+
+            // Jika data di lokal lebih baru (Misal baru diedit atau baru didelete), maka timpa data drive
+            if (localTime > existingTime) {
+                map.set(item.id, item);
+            }
+        } else {
+            // Data lokal tidak ada di Drive (Misal bikin bookmark offline baru), maka tambahkan
             map.set(item.id, item);
         }
     });
+
+    // Urutkan kembali berdasarkan timestamp (Terbaru di atas)
     return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
