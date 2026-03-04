@@ -125,6 +125,7 @@ function removeBookmark(id) {
 async function initApp() {
     loadSettings();
     loadBookmarks();
+    initGoogleSync();
     const loaderText = document.getElementById('loader-text');
     const isDbDownloaded = localStorage.getItem('is_db_downloaded');
 
@@ -630,9 +631,7 @@ function closeVersePopup() {
     activeVerseData = null;
 }
 
-/* Fungsi Modal Informasi Surah */
 function openSurahInfoModal(surahId) {
-    // MENCEGAH MODAL TERBUKA KETIKA HALAMAN SEDANG DIGESER (SWIPE)
     if (preventNextClick) return;
 
     const data = execQuery(`SELECT name_latin, name_id, long_desc FROM surah WHERE id=${surahId}`);
@@ -877,7 +876,7 @@ function setupQuranTouchEvents() {
 
         isDragging = true;
         isScrolling = null;
-        globalIsDragging = false; // Reset drag marker
+        globalIsDragging = false;
 
         startX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
         startY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
@@ -1068,7 +1067,6 @@ function setupSheetDrag(sheetId, dragAreaId) {
     document.addEventListener('touchend', onEnd);
 }
 
-/* GoTo Popup Logic */
 function openGoToPopup() {
     document.getElementById('goto-modal').classList.add('active');
 
@@ -1173,3 +1171,112 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('DOMContentLoaded', initApp);
+
+/* =========================================
+   GOOGLE DRIVE SYNC LOGIC
+========================================= */
+let driveAccessToken = '';
+let tokenClient;
+let driveFileId = null;
+
+function initGoogleSync() {
+    if (typeof google === 'undefined') {
+        setTimeout(initGoogleSync, 500);
+        return;
+    }
+
+    tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: '219268814398-2lsp4fspvpat7quoc7jq6qe9jpi13c1g.apps.googleusercontent.com',
+        scope: 'https://www.googleapis.com/auth/drive.appdata',
+        callback: (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+                driveAccessToken = tokenResponse.access_token;
+                performSync();
+            }
+        },
+    });
+}
+
+function handleAuthClick() {
+    if (!tokenClient) {
+        showToast("Sistem Sinkronisasi belum siap. Coba sebentar lagi.");
+        return;
+    }
+    showToast("Meminta akses ke Google...");
+    tokenClient.requestAccessToken();
+}
+
+async function performSync() {
+    showToast("Memulai sinkronisasi data...");
+
+    try {
+        const searchRes = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name="quran_sync.json"', {
+            headers: { 'Authorization': 'Bearer ' + driveAccessToken }
+        });
+        const searchData = await searchRes.json();
+
+        let remoteData = { bookmarks: [], folders: [] };
+
+        if (searchData.files && searchData.files.length > 0) {
+            driveFileId = searchData.files[0].id;
+
+            const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
+                headers: { 'Authorization': 'Bearer ' + driveAccessToken }
+            });
+            remoteData = await fileRes.json();
+        }
+
+        appBookmarks = mergeArrays(appBookmarks, remoteData.bookmarks || []);
+        appFolders = mergeArrays(appFolders, remoteData.folders || []);
+
+        saveBookmarks();
+        renderBookmarkTab();
+
+        await uploadToDrive({ bookmarks: appBookmarks, folders: appFolders });
+
+        showToast("Sinkronisasi berhasil!");
+    } catch (error) {
+        console.error("Sync error:", error);
+        showToast("Gagal melakukan sinkronisasi dengan Google Drive.");
+    }
+}
+
+function mergeArrays(localArr, remoteArr) {
+    const map = new Map();
+    remoteArr.forEach(item => map.set(item.id, item));
+    localArr.forEach(item => {
+        if (!map.has(item.id)) {
+            map.set(item.id, item);
+        }
+    });
+    return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+}
+
+async function uploadToDrive(dataObj) {
+    const metadata = {
+        name: 'quran_sync.json',
+        parents: ['appDataFolder']
+    };
+
+    const file = new Blob([JSON.stringify(dataObj)], { type: 'application/json' });
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', file);
+
+    const url = driveFileId
+        ? `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=multipart`
+        : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+
+    const method = driveFileId ? 'PATCH' : 'POST';
+
+    const res = await fetch(url, {
+        method: method,
+        headers: { 'Authorization': 'Bearer ' + driveAccessToken },
+        body: form
+    });
+
+    const resData = await res.json();
+    if (!driveFileId && resData.id) {
+        driveFileId = resData.id;
+    }
+}

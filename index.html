@@ -53,8 +53,12 @@
             </div>
             <div id="pane-1" class="tab-pane"><div class="list-container" id="juz-list"></div></div>
             <div id="pane-2" class="tab-pane">
-                <div class="bookmark-header-actions">
+                <div class="bookmark-header-actions" style="display: flex; gap: 10px;">
                     <button class="btn-create-folder" onclick="openCreateFolderModal()">+ Buat Folder</button>
+                    <button class="btn-create-folder" id="btn-sync-drive" onclick="handleAuthClick()" style="background-color: #4285F4; color: white;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg>
+                        Sync Google
+                    </button>
                 </div>
                 <div id="bookmark-root-view">
                     <div class="list-container" id="folder-list" style="padding-bottom: 0;"></div>
@@ -226,6 +230,7 @@
     </div>
 </div>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="sql-wasm.js"></script>
 <script src="script.js"></script>
 </body>
