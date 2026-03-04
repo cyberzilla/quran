@@ -5,6 +5,7 @@ const ASSETS_TO_CACHE = [
     './style.css',
     './script.js',
     './manifest.json',
+    './icon-512.png',
     './icon-192.png',
     './quran.sqlite', // File database SQLite
     './sql-wasm.js',
