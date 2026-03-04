@@ -1204,7 +1204,7 @@ document.addEventListener('DOMContentLoaded', initApp);
 
 
 /* =========================================
-   GOOGLE DRIVE SYNC LOGIC (DIPERBARUI)
+   GOOGLE DRIVE SYNC LOGIC (ADDITIVE BACKUP & FIXED PATCH)
 ========================================= */
 let driveAccessToken = '';
 let tokenClient;
@@ -1217,17 +1217,14 @@ function initGoogleSync() {
     }
 
     tokenClient = google.accounts.oauth2.initTokenClient({
-        // GANTI DENGAN CLIENT ID ASLI ANDA
+        // GANTI DENGAN CLIENT ID ANDA
         client_id: '219268814398-2lsp4fspvpat7quoc7jq6qe9jpi13c1g.apps.googleusercontent.com',
         scope: 'https://www.googleapis.com/auth/drive.appdata',
         callback: (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
                 driveAccessToken = tokenResponse.access_token;
-
-                // Simpan flag bahwa user sudah login/connect ke Drive
                 localStorage.setItem('quran_gdrive_linked', 'true');
                 updateSyncButtonUI();
-
                 performSync();
             }
         },
@@ -1236,7 +1233,6 @@ function initGoogleSync() {
     updateSyncButtonUI();
 }
 
-// PERUBAHAN UI: Perbarui Tampilan Tombol Jika Sudah Linked
 function updateSyncButtonUI() {
     const btn = document.getElementById('btn-sync-drive');
     if (!btn) return;
@@ -1244,7 +1240,7 @@ function updateSyncButtonUI() {
     const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
     if (isLinked) {
         btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg> Sinkronisasi`;
-        btn.style.backgroundColor = '#10b981'; // Ubah warna jadi hijau jika sudah linked
+        btn.style.backgroundColor = '#10b981';
     }
 }
 
@@ -1257,7 +1253,6 @@ function handleAuthClick() {
     const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
     showToast(isLinked ? "Menyinkronkan Data..." : "Meminta akses ke Google...");
 
-    // PERUBAHAN: Gunakan prompt kosong agar popup tidak muncul jika session Google masih aktif di browser
     if (isLinked) {
         tokenClient.requestAccessToken({prompt: ''});
     } else {
@@ -1267,89 +1262,94 @@ function handleAuthClick() {
 
 async function performSync() {
     try {
-        // PERUBAHAN: Format Query yang benar menggunakan petik tunggal ' ' di dalam encodeURIComponent
         const queryStr = encodeURIComponent("name='quran_sync.json'");
         const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${queryStr}`, {
             headers: { 'Authorization': 'Bearer ' + driveAccessToken }
         });
+
+        if (!searchRes.ok) throw new Error("Gagal mencari file di Google Drive");
         const searchData = await searchRes.json();
 
         let remoteData = { bookmarks: [], folders: [] };
 
         if (searchData.files && searchData.files.length > 0) {
             driveFileId = searchData.files[0].id;
-            localStorage.setItem('quran_drive_file_id', driveFileId); // Simpan ID agar lebih cepat selanjutnya
+            localStorage.setItem('quran_drive_file_id', driveFileId);
 
             const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
                 headers: { 'Authorization': 'Bearer ' + driveAccessToken }
             });
+
             if (fileRes.ok) {
-                remoteData = await fileRes.json();
+                const text = await fileRes.text();
+                if (text && text.trim() !== "") {
+                    remoteData = JSON.parse(text);
+                }
             }
         }
 
-        // Gabungkan array lokal dan remote
-        appBookmarks = mergeArrays(appBookmarks, remoteData.bookmarks || []);
-        appFolders = mergeArrays(appFolders, remoteData.folders || []);
+        // Panggil fungsi Additive Merge (Drive prioritas)
+        appBookmarks = mergeAdditive(appBookmarks, remoteData.bookmarks || []);
+        appFolders = mergeAdditive(appFolders, remoteData.folders || []);
 
         saveBookmarks();
         renderBookmarkTab();
 
-        // Refresh folder view jika sedang di dalam folder
         if (currentViewingFolderId) {
-            const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
+            const folder = appFolders.find(f => f.id === currentViewingFolderId);
             if (folder) openFolderView(folder.id, folder.name);
             else closeFolderView();
         }
 
-        // Unggah data terbaru (hasil gabungan) kembali ke Drive
-        await uploadToDrive({ bookmarks: appBookmarks, folders: appFolders });
+        // Unggah kombinasi terbaru
+        await uploadToDriveRobust({ bookmarks: appBookmarks, folders: appFolders });
 
-        showToast("Sinkronisasi berhasil!");
+        showToast("Sinkronisasi (Restore) Berhasil!");
     } catch (error) {
         console.error("Sync error:", error);
-        showToast("Gagal melakukan sinkronisasi dengan Google Drive.");
+        showToast("Gagal melakukan sinkronisasi: " + error.message);
     }
 }
 
-// PERUBAHAN: Mekanisme Merge Baru (Cek Timestamp & Soft Delete)
-function mergeArrays(localArr, remoteArr) {
+function mergeAdditive(localArr, remoteArr) {
     const map = new Map();
 
-    // Proses data remote terlebih dahulu
+    // 1. Masukkan semua data dari Google Drive (Data Utama)
     remoteArr.forEach(item => map.set(item.id, item));
 
-    // Proses data lokal, bandingkan stempel waktu
+    // 2. Masukkan data lokal (Jika pengguna baru membuat bookmark di HP sebelum klik Sync)
     localArr.forEach(item => {
-        if (map.has(item.id)) {
-            const existingItem = map.get(item.id);
-            const existingTime = existingItem.timestamp || 0;
-            const localTime = item.timestamp || 0;
-
-            // Timpa data remote jika data lokal Lbh baru (Misal: User baru saja menghapusnya secara lokal)
-            if (localTime > existingTime) {
-                map.set(item.id, item);
-            }
-        } else {
-            // Jika data lokal belum ada di remote, tambahkan
+        if (!map.has(item.id)) {
             map.set(item.id, item);
         }
     });
 
-    // Kembalikan sebagai array yang diurutkan berdasarkan timestamp dari terbaru
     return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
-async function uploadToDrive(dataObj) {
+// PERBAIKAN: Menghindari 403 Forbidden pada PATCH & cek status res.ok
+async function uploadToDriveRobust(dataObj) {
     const metadata = {
-        name: 'quran_sync.json',
-        parents: ['appDataFolder']
+        name: 'quran_sync.json'
     };
 
-    const file = new Blob([JSON.stringify(dataObj)], { type: 'application/json' });
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', file);
+    // ATURAN PENTING: Hanya kirimkan 'parents' jika ini file baru (POST).
+    // API Drive v3 menolak 'parents' saat melakukan PATCH (Update).
+    if (!driveFileId) {
+        metadata.parents = ['appDataFolder'];
+    }
+
+    const boundary = '-------314159265358979323846';
+    const delimiter = "\r\n--" + boundary + "\r\n";
+    const closeDelim = "\r\n--" + boundary + "--";
+
+    const body = delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(dataObj) +
+        closeDelim;
 
     const url = driveFileId
         ? `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=multipart`
@@ -1359,9 +1359,19 @@ async function uploadToDrive(dataObj) {
 
     const res = await fetch(url, {
         method: method,
-        headers: { 'Authorization': 'Bearer ' + driveAccessToken },
-        body: form
+        headers: {
+            'Authorization': 'Bearer ' + driveAccessToken,
+            'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body: body
     });
+
+    // Lempar error agar ditangkap oleh catch di performSync() dan menampilkan toast "Gagal"
+    if (!res.ok) {
+        const errText = await res.text();
+        console.error("Detail Error Upload API Google Drive:", errText);
+        throw new Error(`Upload ditolak oleh Google Drive (HTTP ${res.status})`);
+    }
 
     const resData = await res.json();
     if (!driveFileId && resData.id) {
