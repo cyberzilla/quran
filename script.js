@@ -87,7 +87,8 @@ function addBookmark() {
         pageNumber: activeVerseData.pageNumber,
         surahName: activeVerseData.surahName,
         folderId: currentViewingFolderId || null,
-        timestamp: new Date().getTime()
+        timestamp: new Date().getTime(),
+        deleted: false
     });
 
     saveBookmarks();
@@ -110,8 +111,14 @@ function promptRemoveBookmark(id) {
     });
 }
 
+// PERUBAHAN: Soft Delete untuk Bookmark
 function removeBookmark(id) {
-    appBookmarks = appBookmarks.filter(b => b.id !== id);
+    const index = appBookmarks.findIndex(b => b.id === id);
+    if (index > -1) {
+        appBookmarks[index].deleted = true;
+        appBookmarks[index].timestamp = new Date().getTime(); // Update waktu agar menimpa data di Drive
+    }
+
     saveBookmarks();
     if (currentViewingFolderId) {
         const folder = appFolders.find(f => f.id === currentViewingFolderId);
@@ -297,11 +304,21 @@ function promptDeleteFolder(id) {
     });
 }
 
+// PERUBAHAN: Soft Delete untuk Folder
 function deleteFolder(id) {
     appBookmarks.forEach(b => {
-        if (b.folderId === id) b.folderId = null;
+        if (b.folderId === id) {
+            b.folderId = null;
+            b.timestamp = new Date().getTime(); // Update timestamp perpindahan folder
+        }
     });
-    appFolders = appFolders.filter(f => f.id !== id);
+
+    const index = appFolders.findIndex(f => f.id === id);
+    if (index > -1) {
+        appFolders[index].deleted = true;
+        appFolders[index].timestamp = new Date().getTime(); // Update waktu folder dihapus
+    }
+
     saveBookmarks();
     renderBookmarkTab();
     showToast("Folder berhasil dihapus");
@@ -316,11 +333,11 @@ function moveBookmark(id, dir) {
     let targetIndex = -1;
     if (dir === -1) {
         for (let i = bmIndex - 1; i >= 0; i--) {
-            if (appBookmarks[i].folderId === folderId) { targetIndex = i; break; }
+            if (appBookmarks[i].folderId === folderId && !appBookmarks[i].deleted) { targetIndex = i; break; }
         }
     } else {
         for (let i = bmIndex + 1; i < appBookmarks.length; i++) {
-            if (appBookmarks[i].folderId === folderId) { targetIndex = i; break; }
+            if (appBookmarks[i].folderId === folderId && !appBookmarks[i].deleted) { targetIndex = i; break; }
         }
     }
 
@@ -338,6 +355,7 @@ function moveBookmark(id, dir) {
     }
 }
 
+// PERUBAHAN: Filter Data yang 'deleted' agar tidak tampil
 function renderBookmarkTab() {
     const folderList = document.getElementById('folder-list');
     const bookmarkList = document.getElementById('bookmark-list');
@@ -345,8 +363,9 @@ function renderBookmarkTab() {
     if(!folderList || !bookmarkList) return;
 
     let folderHtml = '';
-    appFolders.forEach(folder => {
-        const count = appBookmarks.filter(b => b.folderId === folder.id).length;
+    // Hanya render folder yang tidak dihapus
+    appFolders.filter(f => !f.deleted).forEach(folder => {
+        const count = appBookmarks.filter(b => b.folderId === folder.id && !b.deleted).length;
         folderHtml += `
             <div class="list-item folder-item" onclick="openFolderView('${folder.id}', '${folder.name}')">
                 <div class="item-number" style="background:var(--primary); color:white;">
@@ -374,8 +393,11 @@ function renderBookmarkTab() {
     });
     folderList.innerHTML = folderHtml;
 
-    const rootBookmarks = appBookmarks.filter(b => !b.folderId);
-    if(rootBookmarks.length > 0 || appFolders.length > 0) {
+    // Hanya tampilkan bookmark root yang tidak dihapus
+    const rootBookmarks = appBookmarks.filter(b => !b.folderId && !b.deleted);
+    const visibleFolders = appFolders.filter(f => !f.deleted);
+
+    if(rootBookmarks.length > 0 || visibleFolders.length > 0) {
         titleSemua.style.display = 'block';
     } else {
         titleSemua.style.display = 'none';
@@ -423,7 +445,12 @@ function closeFolderModal() { document.getElementById('folder-create-modal').cla
 function executeCreateFolder() {
     const name = document.getElementById('input-folder-name').value.trim();
     if(name) {
-        appFolders.push({ id: 'f_' + new Date().getTime(), name: name });
+        appFolders.push({
+            id: 'f_' + new Date().getTime(),
+            name: name,
+            timestamp: new Date().getTime(),
+            deleted: false
+        });
         saveBookmarks();
         renderBookmarkTab();
         closeFolderModal();
@@ -436,7 +463,8 @@ function openMoveModal(bookmarkId) {
     if(!bookmarkToMove) return;
     const list = document.getElementById('move-folder-list');
     let html = `<div class="move-folder-item" onclick="executeMoveBookmark(null)">-- Tanpa Folder (Root) --</div>`;
-    appFolders.forEach(f => {
+    // Hanya tampilkan folder yang tidak dihapus
+    appFolders.filter(f => !f.deleted).forEach(f => {
         html += `<div class="move-folder-item" onclick="executeMoveBookmark('${f.id}')">📁 ${f.name}</div>`;
     });
     list.innerHTML = html;
@@ -449,6 +477,7 @@ function closeMoveModal() {
 function executeMoveBookmark(folderId) {
     if(bookmarkToMove) {
         bookmarkToMove.folderId = folderId;
+        bookmarkToMove.timestamp = new Date().getTime(); // Update timestamp karena terjadi perubahan
         saveBookmarks();
         if (currentViewingFolderId) {
             const folder = appFolders.find(f => f.id === currentViewingFolderId);
@@ -469,7 +498,8 @@ function openFolderView(folderId, folderName) {
     document.querySelector('.bookmark-header-actions').style.display = 'none';
 
     const container = document.getElementById('folder-content-list');
-    const folderBookmarks = appBookmarks.filter(b => b.folderId === folderId);
+    // Hanya tampilkan bookmark di folder ini yang tidak dihapus
+    const folderBookmarks = appBookmarks.filter(b => b.folderId === folderId && !b.deleted);
 
     if(folderBookmarks.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted);">Folder ini kosong.</div>';
@@ -1172,12 +1202,13 @@ window.addEventListener('resize', () => {
 
 document.addEventListener('DOMContentLoaded', initApp);
 
+
 /* =========================================
-   GOOGLE DRIVE SYNC LOGIC
+   GOOGLE DRIVE SYNC LOGIC (DIPERBARUI)
 ========================================= */
 let driveAccessToken = '';
 let tokenClient;
-let driveFileId = null;
+let driveFileId = localStorage.getItem('quran_drive_file_id') || null;
 
 function initGoogleSync() {
     if (typeof google === 'undefined') {
@@ -1186,15 +1217,35 @@ function initGoogleSync() {
     }
 
     tokenClient = google.accounts.oauth2.initTokenClient({
+        // GANTI DENGAN CLIENT ID ASLI ANDA
         client_id: '219268814398-2lsp4fspvpat7quoc7jq6qe9jpi13c1g.apps.googleusercontent.com',
         scope: 'https://www.googleapis.com/auth/drive.appdata',
         callback: (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
                 driveAccessToken = tokenResponse.access_token;
+
+                // Simpan flag bahwa user sudah login/connect ke Drive
+                localStorage.setItem('quran_gdrive_linked', 'true');
+                updateSyncButtonUI();
+
                 performSync();
             }
         },
     });
+
+    updateSyncButtonUI();
+}
+
+// PERUBAHAN UI: Perbarui Tampilan Tombol Jika Sudah Linked
+function updateSyncButtonUI() {
+    const btn = document.getElementById('btn-sync-drive');
+    if (!btn) return;
+
+    const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
+    if (isLinked) {
+        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg> Sinkronisasi`;
+        btn.style.backgroundColor = '#10b981'; // Ubah warna jadi hijau jika sudah linked
+    }
 }
 
 function handleAuthClick() {
@@ -1202,15 +1253,23 @@ function handleAuthClick() {
         showToast("Sistem Sinkronisasi belum siap. Coba sebentar lagi.");
         return;
     }
-    showToast("Meminta akses ke Google...");
-    tokenClient.requestAccessToken();
+
+    const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
+    showToast(isLinked ? "Menyinkronkan Data..." : "Meminta akses ke Google...");
+
+    // PERUBAHAN: Gunakan prompt kosong agar popup tidak muncul jika session Google masih aktif di browser
+    if (isLinked) {
+        tokenClient.requestAccessToken({prompt: ''});
+    } else {
+        tokenClient.requestAccessToken();
+    }
 }
 
 async function performSync() {
-    showToast("Memulai sinkronisasi data...");
-
     try {
-        const searchRes = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name="quran_sync.json"', {
+        // PERUBAHAN: Format Query yang benar menggunakan petik tunggal ' ' di dalam encodeURIComponent
+        const queryStr = encodeURIComponent("name='quran_sync.json'");
+        const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${queryStr}`, {
             headers: { 'Authorization': 'Bearer ' + driveAccessToken }
         });
         const searchData = await searchRes.json();
@@ -1219,19 +1278,31 @@ async function performSync() {
 
         if (searchData.files && searchData.files.length > 0) {
             driveFileId = searchData.files[0].id;
+            localStorage.setItem('quran_drive_file_id', driveFileId); // Simpan ID agar lebih cepat selanjutnya
 
             const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
                 headers: { 'Authorization': 'Bearer ' + driveAccessToken }
             });
-            remoteData = await fileRes.json();
+            if (fileRes.ok) {
+                remoteData = await fileRes.json();
+            }
         }
 
+        // Gabungkan array lokal dan remote
         appBookmarks = mergeArrays(appBookmarks, remoteData.bookmarks || []);
         appFolders = mergeArrays(appFolders, remoteData.folders || []);
 
         saveBookmarks();
         renderBookmarkTab();
 
+        // Refresh folder view jika sedang di dalam folder
+        if (currentViewingFolderId) {
+            const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
+            if (folder) openFolderView(folder.id, folder.name);
+            else closeFolderView();
+        }
+
+        // Unggah data terbaru (hasil gabungan) kembali ke Drive
         await uploadToDrive({ bookmarks: appBookmarks, folders: appFolders });
 
         showToast("Sinkronisasi berhasil!");
@@ -1241,14 +1312,31 @@ async function performSync() {
     }
 }
 
+// PERUBAHAN: Mekanisme Merge Baru (Cek Timestamp & Soft Delete)
 function mergeArrays(localArr, remoteArr) {
     const map = new Map();
+
+    // Proses data remote terlebih dahulu
     remoteArr.forEach(item => map.set(item.id, item));
+
+    // Proses data lokal, bandingkan stempel waktu
     localArr.forEach(item => {
-        if (!map.has(item.id)) {
+        if (map.has(item.id)) {
+            const existingItem = map.get(item.id);
+            const existingTime = existingItem.timestamp || 0;
+            const localTime = item.timestamp || 0;
+
+            // Timpa data remote jika data lokal Lbh baru (Misal: User baru saja menghapusnya secara lokal)
+            if (localTime > existingTime) {
+                map.set(item.id, item);
+            }
+        } else {
+            // Jika data lokal belum ada di remote, tambahkan
             map.set(item.id, item);
         }
     });
+
+    // Kembalikan sebagai array yang diurutkan berdasarkan timestamp dari terbaru
     return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
@@ -1278,5 +1366,6 @@ async function uploadToDrive(dataObj) {
     const resData = await res.json();
     if (!driveFileId && resData.id) {
         driveFileId = resData.id;
+        localStorage.setItem('quran_drive_file_id', driveFileId);
     }
 }
