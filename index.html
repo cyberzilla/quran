@@ -53,12 +53,21 @@
             </div>
             <div id="pane-1" class="tab-pane"><div class="list-container" id="juz-list"></div></div>
             <div id="pane-2" class="tab-pane">
-                <div class="bookmark-header-actions" style="display: flex; gap: 10px;">
-                    <button class="btn-create-folder" onclick="openCreateFolderModal()">+ Buat Folder</button>
-                    <button class="btn-create-folder" id="btn-sync-drive" onclick="handleAuthClick()" style="background-color: #4285F4; color: white;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg>
-                        Sync Google
-                    </button>
+                <div class="bookmark-header-actions" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
+                    <div style="display: flex; gap: 10px; width: 100%;">
+                        <button class="btn-create-folder" onclick="openCreateFolderModal()" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 10px 5px;">
+                            + Buat Folder
+                        </button>
+                        <button class="btn-create-folder" id="btn-sync-drive" onclick="handleAuthClick()" style="flex: 1; background-color: #4285F4; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 10px 5px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 3px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg>
+                            Sync Google
+                        </button>
+                    </div>
+
+                    <div id="sync-info-container" style="display: none; font-size: 0.75rem; color: var(--text-muted); text-align: right; line-height: 1.5; padding-right: 5px;">
+                        <div id="sync-account-name" style="font-weight: 600; color: var(--primary);">Terhubung: -</div>
+                        <div id="sync-last-time">Terakhir Sync: -</div>
+                    </div>
                 </div>
                 <div id="bookmark-root-view">
                     <div class="list-container" id="folder-list" style="padding-bottom: 0;"></div>

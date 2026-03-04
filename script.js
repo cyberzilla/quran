@@ -1204,7 +1204,7 @@ document.addEventListener('DOMContentLoaded', initApp);
 
 
 /* =========================================
-   GOOGLE DRIVE SYNC LOGIC (ADDITIVE BACKUP & FIXED PATCH)
+   GOOGLE DRIVE SYNC LOGIC (WITH UI INFO)
 ========================================= */
 let driveAccessToken = '';
 let tokenClient;
@@ -1219,11 +1219,26 @@ function initGoogleSync() {
     tokenClient = google.accounts.oauth2.initTokenClient({
         // GANTI DENGAN CLIENT ID ANDA
         client_id: '219268814398-2lsp4fspvpat7quoc7jq6qe9jpi13c1g.apps.googleusercontent.com',
-        scope: 'https://www.googleapis.com/auth/drive.appdata',
+        // Tambahkan scope userinfo.email untuk bisa mengambil email pengguna
+        scope: 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email',
         callback: (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
                 driveAccessToken = tokenResponse.access_token;
                 localStorage.setItem('quran_gdrive_linked', 'true');
+
+                // Ambil info email pengguna di background
+                fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { 'Authorization': 'Bearer ' + driveAccessToken }
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.email) {
+                            localStorage.setItem('quran_sync_email', data.email);
+                            updateSyncButtonUI();
+                        }
+                    })
+                    .catch(err => console.error("Gagal memuat profil pengguna:", err));
+
                 updateSyncButtonUI();
                 performSync();
             }
@@ -1233,14 +1248,29 @@ function initGoogleSync() {
     updateSyncButtonUI();
 }
 
+// PERBARUAN: Menampilkan Info Email & Waktu Terakhir Sync
 function updateSyncButtonUI() {
     const btn = document.getElementById('btn-sync-drive');
+    const infoContainer = document.getElementById('sync-info-container');
+    const accountEl = document.getElementById('sync-account-name');
+    const timeEl = document.getElementById('sync-last-time');
+
     if (!btn) return;
 
     const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
     if (isLinked) {
         btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg> Sinkronisasi`;
-        btn.style.backgroundColor = '#10b981';
+        btn.style.backgroundColor = '#10b981'; // Warna Hijau
+
+        if (infoContainer) {
+            infoContainer.style.display = 'block';
+
+            const savedEmail = localStorage.getItem('quran_sync_email') || 'Menunggu Info...';
+            const lastSync = localStorage.getItem('quran_last_sync') || 'Belum pernah';
+
+            if (accountEl) accountEl.innerText = `Terhubung: ${savedEmail}`;
+            if (timeEl) timeEl.innerText = `Terakhir Sync: ${lastSync}`;
+        }
     }
 }
 
@@ -1288,7 +1318,7 @@ async function performSync() {
             }
         }
 
-        // Panggil fungsi Additive Merge (Drive prioritas)
+        // Additive Merge (Drive prioritas)
         appBookmarks = mergeAdditive(appBookmarks, remoteData.bookmarks || []);
         appFolders = mergeAdditive(appFolders, remoteData.folders || []);
 
@@ -1304,7 +1334,13 @@ async function performSync() {
         // Unggah kombinasi terbaru
         await uploadToDriveRobust({ bookmarks: appBookmarks, folders: appFolders });
 
-        showToast("Sinkronisasi (Restore) Berhasil!");
+        // Simpan Waktu Terakhir Berhasil Sync
+        const now = new Date();
+        const timeString = now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+        localStorage.setItem('quran_last_sync', timeString);
+        updateSyncButtonUI();
+
+        showToast("Sinkronisasi Berhasil!");
     } catch (error) {
         console.error("Sync error:", error);
         showToast("Gagal melakukan sinkronisasi: " + error.message);
@@ -1313,28 +1349,18 @@ async function performSync() {
 
 function mergeAdditive(localArr, remoteArr) {
     const map = new Map();
-
-    // 1. Masukkan semua data dari Google Drive (Data Utama)
     remoteArr.forEach(item => map.set(item.id, item));
-
-    // 2. Masukkan data lokal (Jika pengguna baru membuat bookmark di HP sebelum klik Sync)
     localArr.forEach(item => {
         if (!map.has(item.id)) {
             map.set(item.id, item);
         }
     });
-
     return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
-// PERBAIKAN: Menghindari 403 Forbidden pada PATCH & cek status res.ok
 async function uploadToDriveRobust(dataObj) {
-    const metadata = {
-        name: 'quran_sync.json'
-    };
+    const metadata = { name: 'quran_sync.json' };
 
-    // ATURAN PENTING: Hanya kirimkan 'parents' jika ini file baru (POST).
-    // API Drive v3 menolak 'parents' saat melakukan PATCH (Update).
     if (!driveFileId) {
         metadata.parents = ['appDataFolder'];
     }
@@ -1366,11 +1392,10 @@ async function uploadToDriveRobust(dataObj) {
         body: body
     });
 
-    // Lempar error agar ditangkap oleh catch di performSync() dan menampilkan toast "Gagal"
     if (!res.ok) {
         const errText = await res.text();
-        console.error("Detail Error Upload API Google Drive:", errText);
-        throw new Error(`Upload ditolak oleh Google Drive (HTTP ${res.status})`);
+        console.error("Detail Error Upload API:", errText);
+        throw new Error(`Upload ditolak oleh server (HTTP ${res.status})`);
     }
 
     const resData = await res.json();
