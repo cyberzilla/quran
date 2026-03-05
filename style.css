@@ -365,7 +365,7 @@ body {
 .surah-name-latin { font-weight: 600; font-size: 0.85rem; color: var(--text-main); }
 .surah-name-translation { font-weight: 400; font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
 
-.bismillah-header {text-align: center; display: block; font-size: var(--arabic-font-size); margin-top: 10px; margin-bottom: 3px; color: var(--text-main); direction: rtl; }
+.bismillah-header {font-family: 'juz', serif; text-align: center; display: block; font-size: var(--arabic-font-size); margin-top: 10px; margin-bottom: 3px; color: var(--text-main); direction: rtl; }
 
 .bottom-nav {
     position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
