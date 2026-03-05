@@ -1278,8 +1278,8 @@ function updateSyncButtonUI() {
             const savedEmail = localStorage.getItem('quran_sync_email') || 'Menunggu Info...';
             const lastSync = localStorage.getItem('quran_last_sync') || 'Belum pernah';
 
-            if (accountEl) accountEl.innerText = `Terhubung: ${savedEmail}`;
-            if (timeEl) timeEl.innerText = `Terakhir Sync: ${lastSync}`;
+            if (accountEl) accountEl.innerText = `${savedEmail}`;
+            if (timeEl) timeEl.innerText = `${lastSync}`;
         }
     }
 }
