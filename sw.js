@@ -7,10 +7,10 @@ const ASSETS_TO_CACHE = [
     './manifest.json',
     './icon-512.png',
     './icon-192.png',
-    './quran.sqlite', // File database SQLite
+    './quran.sqlite',
     './sql-wasm.js',
     './sql-wasm.wasm',
-    './DigitalKhattIndoPak.otf',
+    './dkip.woff2',
     './inter-regular.woff2',
     './inter-semibold.woff2',
     './juz.woff2',
