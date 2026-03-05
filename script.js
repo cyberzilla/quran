@@ -136,6 +136,7 @@ function removeBookmark(id) {
 
 function setLastRead() {
     if(!activeVerseData) return;
+
     appLastRead = {
         surahId: activeVerseData.surahId,
         verseId: activeVerseData.verseId,
@@ -143,11 +144,17 @@ function setLastRead() {
         surahName: activeVerseData.surahName,
         timestamp: new Date().getTime()
     };
+
     saveBookmarks();
     renderBookmarkTab();
     showToast("Ditandai sebagai Terakhir Dibaca");
     closeVersePopup();
     document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
+
+    // Auto-Sync background khusus untuk Last Read agar mulus di device lain
+    if (localStorage.getItem('quran_gdrive_linked') === 'true' && driveAccessToken) {
+        performSync(true); // Memanggil sync secara silent (tanpa toast notifikasi kecuali gagal)
+    }
 }
 
 async function initApp() {
@@ -397,7 +404,6 @@ const svgEdit = `<svg ${iconProps}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2
 const svgTrash = `<svg ${iconProps}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
 
 function renderBookmarkTab() {
-    // Render Last Read
     const lastReadContainer = document.getElementById('last-read-container');
     const titleLastRead = document.getElementById('title-last-read');
 
@@ -1406,7 +1412,8 @@ function handleAuthClick() {
     }
 }
 
-async function performSync() {
+// Tambahkan parameter isSilent agar bisa dipanggil tanpa memunculkan toast notifikasi (untuk background sync)
+async function performSync(isSilent = false) {
     try {
         const queryStr = encodeURIComponent("name='quran_sync.json'");
         const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${queryStr}`, {
@@ -1429,15 +1436,25 @@ async function performSync() {
             if (fileRes.ok) {
                 const text = await fileRes.text();
                 if (text && text.trim() !== "") {
-                    remoteData = JSON.parse(text);
+                    try {
+                        let parsedData = JSON.parse(text);
+                        // Parsing spesifik untuk mencegah override undefined dari struktur JSON lama
+                        remoteData.bookmarks = parsedData.bookmarks || [];
+                        remoteData.folders = parsedData.folders || [];
+                        remoteData.lastRead = parsedData.lastRead || null;
+                    } catch (e) {
+                        console.error("Format JSON file di GDrive tidak valid.", e);
+                    }
                 }
             }
         }
 
-        appBookmarks = mergeSyncData(appBookmarks, remoteData.bookmarks || []);
-        appFolders = mergeSyncData(appFolders, remoteData.folders || []);
+        appBookmarks = mergeSyncData(appBookmarks, remoteData.bookmarks);
+        appFolders = mergeSyncData(appFolders, remoteData.folders);
 
+        // Logika Sinkronisasi Khusus Terakhir Dibaca
         if (remoteData.lastRead) {
+            // Timpa dengan data remote JIKA data lokal kosong, ATAU data remote lebih baru
             if (!appLastRead || (remoteData.lastRead.timestamp > appLastRead.timestamp)) {
                 appLastRead = remoteData.lastRead;
             }
@@ -1459,10 +1476,10 @@ async function performSync() {
         localStorage.setItem('quran_last_sync', timeString);
         updateSyncButtonUI();
 
-        showToast("Sinkronisasi Berhasil!");
+        if (!isSilent) showToast("Sinkronisasi Berhasil!");
     } catch (error) {
         console.error("Sync error:", error);
-        showToast("Gagal melakukan sinkronisasi: " + error.message);
+        if (!isSilent) showToast("Gagal melakukan sinkronisasi: " + error.message);
     }
 }
 
