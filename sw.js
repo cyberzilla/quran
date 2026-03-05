@@ -10,9 +10,12 @@ const ASSETS_TO_CACHE = [
     './quran.sqlite', // File database SQLite
     './sql-wasm.js',
     './sql-wasm.wasm',
-    './omar.woff2',
+    './DigitalKhattIndoPak.otf',
     './inter-regular.woff2',
-    './inter-semibold.woff2'
+    './inter-semibold.woff2',
+    './juz.woff2',
+    './long.woff2',
+    './short.woff2'
 ];
 
 // Install Event: Menyimpan semua aset awal ke Cache

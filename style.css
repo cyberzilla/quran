@@ -1,6 +1,39 @@
 @font-face {
     font-family: 'omar';
-    src: url('./omar.woff2') format('woff2');
+    /*src: url('./omar.woff2') format('woff2');*/
+    src: url('./DigitalKhattIndoPak.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'juz';
+    src: url('./juz.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'short';
+    src: url('./short.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'long';
+    src: url('./long.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'bismillah';
+    src: url('./bismillah.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -177,7 +210,7 @@ body {
 .item-info { flex: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
 .item-title { font-weight: 500; font-size: 0.95rem; color: var(--text-main); margin-bottom: 2px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 .item-subtitle { font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
-.item-arabic { font-family: 'omar', serif; font-size: 1.35rem; font-weight: normal; color: var(--primary); }
+.item-arabic { font-family: 'short', serif; font-size: 1.35rem; font-weight: normal; color: var(--primary); }
 
 .sticky-wrapper {
     position: relative; top: 0; z-index: 100; flex: 0 0 auto;
@@ -301,11 +334,12 @@ body {
     flex: 2; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;
     border-left: 1px solid rgba(13, 148, 136, 0.2); border-right: 1px solid rgba(13, 148, 136, 0.2); padding: 0 10px;
 }
-.surah-name-ar { font-family: 'omar', serif; font-size: 1.6rem; color: var(--primary); margin-bottom: 4px; line-height: 1; }
+.surah-name-ar { font-family: 'long', serif; font-size: 2.5rem; color: var(--primary); margin-bottom: 4px; line-height: 1; }
+.juz-title {font-family: 'juz', serif; font-size: 1.5rem;}
 .surah-name-latin { font-weight: 600; font-size: 0.85rem; color: var(--text-main); }
 .surah-name-translation { font-weight: 400; font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
 
-.bismillah-header { text-align: center; display: block; font-size: var(--arabic-font-size); margin-top: 10px; margin-bottom: 20px; color: var(--text-main); direction: rtl; }
+.bismillah-header {text-align: center; display: block; font-size: var(--arabic-font-size); margin-top: 10px; margin-bottom: 3px; color: var(--text-main); direction: rtl; }
 
 .bottom-nav {
     position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);

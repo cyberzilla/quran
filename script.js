@@ -264,7 +264,7 @@ function renderSurahList() {
                     <div class="item-title">${surah.name_latin}</div>
                     <div class="item-subtitle">${surah.name_id}</div>
                 </div>
-                <div class="item-arabic">${surah.name_ar}</div>
+                <div class="item-arabic">surah${String(surah.id).padStart(3, '0')}</div>
             </div>
         `;
     });
@@ -556,7 +556,7 @@ function openFolderView(folderId, folderName) {
                     </div>
                 </div>
                 <div class="folder-bookmark-arabic">
-                    ${arabicTextPreview} <span style="font-size:0.7em; color:var(--primary);">۝${toArabicNumber(bm.verseId)}</span>
+                    ${arabicTextPreview}
                 </div>
             </div>
         `;
@@ -594,18 +594,13 @@ function renderJuzList() {
             <div class="list-item" onclick="openQuranPage(${startPage})">
                 <div class="item-number" style="font-size: 0.8rem;">Juz<br>${i}</div>
                 <div class="item-info">
-                    <div class="item-title">Juz ${i}</div>
+                    <div class="juz-title item-title">juz${String(i).padStart(3, '0')}</div>
                     <div class="item-subtitle">${surahName} • Ayat ${verseNumber}</div>
                 </div>
             </div>
         `;
     }
     container.innerHTML = html;
-}
-
-function toArabicNumber(num) {
-    const arabicNumbers = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
-    return num.toString().split('').map(c => arabicNumbers[c]).join('');
 }
 
 function initQuranTrack() {
@@ -734,8 +729,8 @@ function renderPageContent(pageNumber, forceRender = false) {
             html += `
                 <div class="surah-header-separator" onclick="openSurahInfoModal(${v.surah_number})">
                     <div class="surah-col-left">${v.verses_count}<br>Ayat</div>
-                    <div class="surah-col-center">
-                        <div class="surah-name-ar">${v.name_ar}</div>
+                    <div class="surah-col-center">                       
+                        <div class="surah-name-ar">surah${String(v.surah_number).padStart(3, '0')}</div>
                         <div class="surah-name-latin">${v.name_latin}</div>
                         <div class="surah-name-translation">${v.name_id}</div>
                     </div>
@@ -743,7 +738,7 @@ function renderPageContent(pageNumber, forceRender = false) {
                 </div>
             `;
             if (v.surah_number !== 1 && v.surah_number !== 9) {
-                html += `<div class="bismillah-header">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ</div>`;
+                html += `<div class="bismillah-header">﷽</div>`;
             }
         }
 
@@ -761,7 +756,7 @@ function renderPageContent(pageNumber, forceRender = false) {
         const verseElId = `verse-wrap-${v.surah_number}-${v.verse_number}`;
 
         if (isMushafMode) {
-            html += `<span id="${verseElId}" class="verse-mushaf-wrap" onclick="handleVerseClick(${v.surah_number}, ${v.verse_number}, ${pageNumber}, '${safeSurahName}', '${cleanArabicForCopy}', '${cleanTranslationForCopy}', this)"><span class="verse-word">${fullArabicText}</span><span class="verse-end">۝${toArabicNumber(v.verse_number)}</span></span> `;
+            html += `<span id="${verseElId}" class="verse-mushaf-wrap" onclick="handleVerseClick(${v.surah_number}, ${v.verse_number}, ${pageNumber}, '${safeSurahName}', '${cleanArabicForCopy}', '${cleanTranslationForCopy}', this)"><span class="verse-word">${fullArabicText}</span></span> `;
         } else {
             html += `<div id="${verseElId}" class="verse-container" onclick="handleVerseClick(${v.surah_number}, ${v.verse_number}, ${pageNumber}, '${safeSurahName}', '${cleanArabicForCopy}', '${cleanTranslationForCopy}', this)">`;
 
@@ -785,9 +780,8 @@ function renderPageContent(pageNumber, forceRender = false) {
                 } else {
                     html += `<div class="word-group"><div class="word-arabic">${fullArabicText}</div></div>`;
                 }
-                html += `<div class="word-group verse-end-group"><span class="verse-end">۝${toArabicNumber(v.verse_number)}</span></div></div>`;
             } else {
-                html += `<div class="verse-text-group"><span class="verse-word">${fullArabicText}</span> <span class="verse-end">۝${toArabicNumber(v.verse_number)}</span></div>`;
+                html += `<div class="verse-text-group"><span class="verse-word">${fullArabicText}</span></div>`;
             }
 
             if (appSettings.showTransliteration) html += `<div class="verse-transliteration">${v.transliteration || ''}</div>`;
