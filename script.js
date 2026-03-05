@@ -18,6 +18,7 @@ let preventNextClick = false;
 
 let appBookmarks = [];
 let appFolders = [];
+let appLastRead = null; // Menyimpan data history last read
 let activeVerseData = null;
 let currentViewingFolderId = null;
 let bookmarkToMove = null;
@@ -66,15 +67,18 @@ function loadBookmarks() {
     try {
         appBookmarks = JSON.parse(localStorage.getItem('quran_bookmarks') || '[]');
         appFolders = JSON.parse(localStorage.getItem('quran_folders') || '[]');
+        appLastRead = JSON.parse(localStorage.getItem('quran_last_read') || 'null');
     } catch(e) {
         appBookmarks = [];
         appFolders = [];
+        appLastRead = null;
     }
 }
 
 function saveBookmarks() {
     localStorage.setItem('quran_bookmarks', JSON.stringify(appBookmarks));
     localStorage.setItem('quran_folders', JSON.stringify(appFolders));
+    localStorage.setItem('quran_last_read', JSON.stringify(appLastRead));
 }
 
 function addBookmark() {
@@ -88,7 +92,8 @@ function addBookmark() {
         surahName: activeVerseData.surahName,
         folderId: currentViewingFolderId || null,
         timestamp: new Date().getTime(),
-        deleted: false // Set explicitly for new bookmarks
+        deleted: false,
+        hiddenWords: []
     });
 
     saveBookmarks();
@@ -111,12 +116,11 @@ function promptRemoveBookmark(id) {
     });
 }
 
-// LOGIKA BARU: Soft Delete Bookmark (Mekanisme Tombstone)
 function removeBookmark(id) {
     const index = appBookmarks.findIndex(b => b.id === id);
     if (index > -1) {
         appBookmarks[index].deleted = true;
-        appBookmarks[index].timestamp = new Date().getTime(); // Update timestamp agar cloud ikut hapus
+        appBookmarks[index].timestamp = new Date().getTime();
     }
 
     saveBookmarks();
@@ -128,6 +132,22 @@ function removeBookmark(id) {
         renderBookmarkTab();
     }
     showToast("Bookmark berhasil dihapus");
+}
+
+function setLastRead() {
+    if(!activeVerseData) return;
+    appLastRead = {
+        surahId: activeVerseData.surahId,
+        verseId: activeVerseData.verseId,
+        pageNumber: activeVerseData.pageNumber,
+        surahName: activeVerseData.surahName,
+        timestamp: new Date().getTime()
+    };
+    saveBookmarks();
+    renderBookmarkTab();
+    showToast("Ditandai sebagai Terakhir Dibaca");
+    closeVersePopup();
+    document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
 }
 
 async function initApp() {
@@ -305,18 +325,15 @@ function moveFolder(id, dir) {
     }
 }
 
-// LOGIKA BARU: Pesan Konfirmasi Hapus Folder
 function promptDeleteFolder(id) {
     showConfirm("Hapus Folder", "Apakah Anda yakin ingin menghapus folder ini beserta seluruh bookmark di dalamnya?", () => {
         deleteFolder(id);
     });
 }
 
-// LOGIKA BARU: Soft Delete Folder beserta Isinya
 function deleteFolder(id) {
     const now = new Date().getTime();
 
-    // Hapus semua bookmark di dalam folder ini (soft delete)
     appBookmarks.forEach(b => {
         if (b.folderId === id) {
             b.deleted = true;
@@ -324,7 +341,6 @@ function deleteFolder(id) {
         }
     });
 
-    // Hapus foldernya (soft delete)
     const index = appFolders.findIndex(f => f.id === id);
     if (index > -1) {
         appFolders[index].deleted = true;
@@ -373,11 +389,41 @@ function moveBookmark(id, dir) {
     }
 }
 
-// LOGIKA BARU: Filter render untuk tidak menampilkan data "deleted: true"
+const iconProps = 'width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const svgUp = `<svg ${iconProps}><path d="M18 15l-6-6-6 6"/></svg>`;
+const svgDown = `<svg ${iconProps}><path d="M6 9l6 6 6-6"/></svg>`;
+const svgFolder = `<svg ${iconProps}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+const svgEdit = `<svg ${iconProps}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+const svgTrash = `<svg ${iconProps}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+
 function renderBookmarkTab() {
+    // Render Last Read
+    const lastReadContainer = document.getElementById('last-read-container');
+    const titleLastRead = document.getElementById('title-last-read');
+
+    if (appLastRead && lastReadContainer) {
+        if (titleLastRead) titleLastRead.style.display = 'block';
+        lastReadContainer.innerHTML = `
+            <div class="list-item" style="border-left: 4px solid var(--primary);" onclick="openQuranPage(${appLastRead.pageNumber}, ${appLastRead.surahId}, ${appLastRead.verseId}, 'lastread')">
+                <div class="item-number" style="background:var(--primary-light); color:var(--primary);">
+                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                </div>
+                <div class="item-info">
+                    <div class="item-title">${appLastRead.surahName}</div>
+                    <div class="item-subtitle">Ayat ${appLastRead.verseId} • Hal ${appLastRead.pageNumber}</div>
+                </div>
+            </div>
+        `;
+    } else if (lastReadContainer) {
+        if (titleLastRead) titleLastRead.style.display = 'none';
+        lastReadContainer.innerHTML = '';
+    }
+
     const folderList = document.getElementById('folder-list');
     const bookmarkList = document.getElementById('bookmark-list');
+    const titleFolder = document.getElementById('title-folder');
     const titleSemua = document.getElementById('title-semua-bookmark');
+
     if(!folderList || !bookmarkList) return;
 
     let folderHtml = '';
@@ -394,32 +440,31 @@ function renderBookmarkTab() {
                     <div class="item-title">${folder.name}</div>
                     <div class="item-subtitle">${count} Ayat tersimpan</div>
                 </div>
-                <div style="display:flex; gap:12px; align-items:center;">
-                    <div class="bookmark-move-controls">
-                        <button onclick="event.stopPropagation(); moveFolder('${folder.id}', -1)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
-                        </button>
-                        <button onclick="event.stopPropagation(); moveFolder('${folder.id}', 1)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                        </button>
-                    </div>
-                    <button class="btn-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);" onclick="event.stopPropagation(); promptDeleteFolder('${folder.id}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
+                <div class="action-group">
+                    <button class="action-btn" onclick="event.stopPropagation(); moveFolder('${folder.id}', -1)">${svgUp}</button>
+                    <button class="action-btn" onclick="event.stopPropagation(); moveFolder('${folder.id}', 1)">${svgDown}</button>
+                    <button class="action-btn danger" onclick="event.stopPropagation(); promptDeleteFolder('${folder.id}')">${svgTrash}</button>
                 </div>
             </div>
         `;
     });
     folderList.innerHTML = folderHtml;
 
+    if (visibleFolders.length > 0 && titleFolder) titleFolder.style.display = 'block';
+    else if (titleFolder) titleFolder.style.display = 'none';
+
     const rootBookmarks = appBookmarks.filter(b => !b.folderId && !b.deleted);
 
-    if(rootBookmarks.length > 0 || visibleFolders.length > 0) {
-        titleSemua.style.display = 'block';
+    if(rootBookmarks.length > 0) {
+        if (titleSemua) titleSemua.style.display = 'block';
     } else {
-        titleSemua.style.display = 'none';
-        bookmarkList.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted);">Belum ada ayat yang disimpan.</div>';
-        return;
+        if (titleSemua) titleSemua.style.display = 'none';
+        if (visibleFolders.length === 0 && !appLastRead) {
+            bookmarkList.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted);">Library Anda masih kosong.</div>';
+            return;
+        } else {
+            bookmarkList.innerHTML = '';
+        }
     }
 
     let bHtml = '';
@@ -431,21 +476,11 @@ function renderBookmarkTab() {
                     <div class="item-title">${bm.surahName}</div>
                     <div class="item-subtitle">Ayat ${bm.verseId}</div>
                 </div>
-                <div style="display:flex; gap:12px; align-items:center;">
-                    <div class="bookmark-move-controls">
-                        <button onclick="event.stopPropagation(); moveBookmark('${bm.id}', -1)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
-                        </button>
-                        <button onclick="event.stopPropagation(); moveBookmark('${bm.id}', 1)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                        </button>
-                    </div>
-                    <button class="btn-icon" onclick="event.stopPropagation(); openMoveModal('${bm.id}')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M5 9l7 7 7-7"/></svg>
-                    </button>
-                    <button class="btn-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);" onclick="event.stopPropagation(); promptRemoveBookmark('${bm.id}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
+                <div class="action-group">
+                    <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', -1)">${svgUp}</button>
+                    <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', 1)">${svgDown}</button>
+                    <button class="action-btn" onclick="event.stopPropagation(); openMoveModal('${bm.id}')">${svgFolder}</button>
+                    <button class="action-btn danger" onclick="event.stopPropagation(); promptRemoveBookmark('${bm.id}')">${svgTrash}</button>
                 </div>
             </div>
         `;
@@ -481,7 +516,6 @@ function openMoveModal(bookmarkId) {
     const list = document.getElementById('move-folder-list');
     let html = `<div class="move-folder-item" onclick="executeMoveBookmark(null)">-- Tanpa Folder (Root) --</div>`;
 
-    // Hanya tampilkan folder yg tidak didelete
     appFolders.filter(f => !f.deleted).forEach(f => {
         html += `<div class="move-folder-item" onclick="executeMoveBookmark('${f.id}')">📁 ${f.name}</div>`;
     });
@@ -497,7 +531,7 @@ function closeMoveModal() {
 function executeMoveBookmark(folderId) {
     if(bookmarkToMove) {
         bookmarkToMove.folderId = folderId;
-        bookmarkToMove.timestamp = new Date().getTime(); // Update timestamp agar sync sinkron
+        bookmarkToMove.timestamp = new Date().getTime();
         saveBookmarks();
         if (currentViewingFolderId) {
             const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
@@ -528,40 +562,108 @@ function openFolderView(folderId, folderName) {
 
     let html = '';
     folderBookmarks.forEach(bm => {
-        let arabicTextPreview = "";
+        let arabicWordsHtml = "";
+        let hiddenWords = bm.hiddenWords || [];
+
         if(db) {
-            const verseData = execQuery(`SELECT arabic_text FROM verses WHERE surah_number=${bm.surahId} AND verse_number=${bm.verseId}`);
-            if(verseData.length > 0) arabicTextPreview = verseData[0].arabic_text;
+            const verseData = execQuery(`SELECT arabic_text, arabic_words FROM verses WHERE surah_number=${bm.surahId} AND verse_number=${bm.verseId}`);
+            if(verseData.length > 0) {
+                let words = [];
+                try {
+                    words = JSON.parse(verseData[0].arabic_words || "[]");
+                } catch(e) {}
+
+                if(words.length === 0) {
+                    words = verseData[0].arabic_text.split(' ');
+                }
+
+                arabicWordsHtml = words.map((w, index) => {
+                    const isHidden = hiddenWords.includes(index) ? 'hidden' : '';
+                    return `<span class="folder-word ${isHidden}">${w}</span>`;
+                }).join('');
+            }
         }
 
         html += `
-            <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:10px;" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
+            <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:12px; padding: 15px;" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
                 <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-                    <div style="font-weight:700; color:var(--primary); font-size:0.9rem;">${bm.surahName} : ${bm.verseId} (Hal ${bm.pageNumber})</div>
-                    <div style="display:flex; gap:12px; align-items:center;">
-                        <div class="bookmark-move-controls">
-                            <button onclick="event.stopPropagation(); moveBookmark('${bm.id}', -1)">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
-                            </button>
-                            <button onclick="event.stopPropagation(); moveBookmark('${bm.id}', 1)">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                            </button>
-                        </div>
-                        <button class="btn-icon" onclick="event.stopPropagation(); openMoveModal('${bm.id}')">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M5 9l7 7 7-7"/></svg>
-                        </button>
-                        <button class="btn-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);" onclick="event.stopPropagation(); promptRemoveBookmark('${bm.id}')">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        </button>
+                    <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">${bm.surahName} : ${bm.verseId}</div>
+                    <div class="action-group">
+                        <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', -1)">${svgUp}</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', 1)">${svgDown}</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); openMoveModal('${bm.id}')">${svgFolder}</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); openEditWordsModal('${bm.id}')" style="color:var(--primary);">${svgEdit}</button>
+                        <button class="action-btn danger" onclick="event.stopPropagation(); promptRemoveBookmark('${bm.id}')">${svgTrash}</button>
                     </div>
                 </div>
                 <div class="folder-bookmark-arabic">
-                    ${arabicTextPreview}
+                    ${arabicWordsHtml}
                 </div>
             </div>
         `;
     });
     container.innerHTML = html;
+}
+
+let editingBookmarkId = null;
+let tempHiddenWords = [];
+
+function openEditWordsModal(bookmarkId) {
+    editingBookmarkId = bookmarkId;
+    const bm = appBookmarks.find(b => b.id === bookmarkId);
+    if (!bm) return;
+
+    tempHiddenWords = [...(bm.hiddenWords || [])];
+
+    let words = [];
+    if(db) {
+        const verseData = execQuery(`SELECT arabic_text, arabic_words FROM verses WHERE surah_number=${bm.surahId} AND verse_number=${bm.verseId}`);
+        if(verseData.length > 0) {
+            try { words = JSON.parse(verseData[0].arabic_words || "[]"); } catch(e) {}
+            if (words.length === 0) words = verseData[0].arabic_text.split(' ');
+        }
+    }
+
+    const container = document.getElementById('edit-words-container');
+    container.innerHTML = words.map((w, index) => {
+        const isHidden = tempHiddenWords.includes(index);
+        return `<div class="edit-word-chip ${isHidden ? 'hidden' : ''}" onclick="toggleWordHidden(${index}, this)">${w}</div>`;
+    }).join('');
+
+    document.getElementById('edit-words-modal').classList.add('active');
+}
+
+function toggleWordHidden(index, element) {
+    const pos = tempHiddenWords.indexOf(index);
+    if (pos > -1) {
+        tempHiddenWords.splice(pos, 1);
+        element.classList.remove('hidden');
+    } else {
+        tempHiddenWords.push(index);
+        element.classList.add('hidden');
+    }
+}
+
+function closeEditWordsModal() {
+    document.getElementById('edit-words-modal').classList.remove('active');
+    editingBookmarkId = null;
+}
+
+function saveEditWords() {
+    if (editingBookmarkId) {
+        const bmIndex = appBookmarks.findIndex(b => b.id === editingBookmarkId);
+        if (bmIndex > -1) {
+            appBookmarks[bmIndex].hiddenWords = [...tempHiddenWords];
+            appBookmarks[bmIndex].timestamp = new Date().getTime();
+            saveBookmarks();
+
+            if (currentViewingFolderId) {
+                const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
+                if (folder) openFolderView(folder.id, folder.name);
+            }
+        }
+    }
+    closeEditWordsModal();
 }
 
 function closeFolderView() {
@@ -650,7 +752,7 @@ function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, t
 
     activeVerseData = { surahId, verseId, pageNumber, surahName, arabicText, translationText };
 
-    if (window._currentClickAction === 'bookmark') {
+    if (window._currentClickAction === 'bookmark' || window._currentClickAction === 'lastread') {
         closeVersePopup();
     } else {
         const titleEl = document.getElementById('vp-title');
@@ -1235,7 +1337,6 @@ function initGoogleSync() {
     }
 
     tokenClient = google.accounts.oauth2.initTokenClient({
-        // GANTI DENGAN CLIENT ID ANDA
         client_id: '219268814398-2lsp4fspvpat7quoc7jq6qe9jpi13c1g.apps.googleusercontent.com',
         scope: 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email',
         callback: (tokenResponse) => {
@@ -1315,7 +1416,7 @@ async function performSync() {
         if (!searchRes.ok) throw new Error("Gagal mencari file di Google Drive");
         const searchData = await searchRes.json();
 
-        let remoteData = { bookmarks: [], folders: [] };
+        let remoteData = { bookmarks: [], folders: [], lastRead: null };
 
         if (searchData.files && searchData.files.length > 0) {
             driveFileId = searchData.files[0].id;
@@ -1333,9 +1434,14 @@ async function performSync() {
             }
         }
 
-        // Panggil fungsi Penggabungan berbasis Timestamp
         appBookmarks = mergeSyncData(appBookmarks, remoteData.bookmarks || []);
         appFolders = mergeSyncData(appFolders, remoteData.folders || []);
+
+        if (remoteData.lastRead) {
+            if (!appLastRead || (remoteData.lastRead.timestamp > appLastRead.timestamp)) {
+                appLastRead = remoteData.lastRead;
+            }
+        }
 
         saveBookmarks();
         renderBookmarkTab();
@@ -1346,7 +1452,7 @@ async function performSync() {
             else closeFolderView();
         }
 
-        await uploadToDriveRobust({ bookmarks: appBookmarks, folders: appFolders });
+        await uploadToDriveRobust({ bookmarks: appBookmarks, folders: appFolders, lastRead: appLastRead });
 
         const now = new Date();
         const timeString = now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
@@ -1360,32 +1466,25 @@ async function performSync() {
     }
 }
 
-// LOGIKA BARU: Merge berbasis TIMESTAMP ("Yang paling baru menang")
-// Mekanisme ini memastikan antara pengguna Clear Cache dan Hapus Data bisa dibedakan.
 function mergeSyncData(localArr, remoteArr) {
     const map = new Map();
 
-    // 1. Daftarkan semua data dari Drive ke peta
     remoteArr.forEach(item => map.set(item.id, item));
 
-    // 2. Bandingkan dengan data Lokal di HP
     localArr.forEach(item => {
         if (map.has(item.id)) {
             const existingItem = map.get(item.id);
             const existingTime = existingItem.timestamp || 0;
             const localTime = item.timestamp || 0;
 
-            // Jika data di lokal lebih baru (Misal baru diedit atau baru didelete), maka timpa data drive
             if (localTime > existingTime) {
                 map.set(item.id, item);
             }
         } else {
-            // Data lokal tidak ada di Drive (Misal bikin bookmark offline baru), maka tambahkan
             map.set(item.id, item);
         }
     });
 
-    // Urutkan kembali berdasarkan timestamp (Terbaru di atas)
     return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
