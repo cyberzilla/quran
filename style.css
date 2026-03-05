@@ -313,7 +313,7 @@ body {
 .bookmark-move-controls button:active { background: var(--border-color); }
 
 .folder-bookmark-arabic {
-    font-family:'omar', serif; font-size:var(--arabic-font-size); text-align:right; width:100%; direction:rtl;
+    font-family:'omar', serif; font-size:var(--arabic-font-size); text-align:right; width:100%; direction:rtl; line-height: 1.7;
 }
 
 .wbw-container {
