@@ -1,7 +1,7 @@
 @font-face {
-    font-family: 'omar';
-    /*src: url('./omar.woff2') format('woff2');*/
-    src: url('./DigitalKhattIndoPak.otf') format('opentype');
+    font-family: 'dkip';
+    src: url('./dkip.woff2') format('woff2');
+    /*src: url('./dkip.otf') format('opentype');*/
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -31,14 +31,6 @@
     font-display: swap;
 }
 
-@font-face {
-    font-family: 'bismillah';
-    src: url('./bismillah.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-
 /* Font Inter Regular */
 @font-face {
     font-family: 'Inter';
@@ -57,7 +49,7 @@
     font-display: swap;
 }
 
-body.font-omar .arabic, body.font-omar .word-arabic { font-family: 'omar', serif; }
+body.font-dkip .arabic, body.font-dkip .word-arabic { font-family: 'dkip', serif; }
 
 :root {
     --bg-body: #F4F6F8;
@@ -315,7 +307,7 @@ body {
 .bookmark-move-controls button:active { background: var(--border-color); }
 
 .folder-bookmark-arabic {
-    font-family:'omar', serif; font-size:var(--arabic-font-size); text-align:right; width:100%; direction:rtl; line-height: 1.7;
+    font-family:'dkip', serif; font-size:var(--arabic-font-size); text-align:right; width:100%; direction:rtl; line-height: 1.7;
 }
 
 .wbw-container {
@@ -330,7 +322,7 @@ body {
 .verse-word { display: inline; }
 .verse-end {
     display: inline-flex; align-items: center; justify-content: center;
-    font-family: 'omar', serif; color: var(--primary); margin: 0 6px; font-size: 0.85em; opacity: 0.9;
+    font-family: 'dkip', serif; color: var(--primary); margin: 0 6px; font-size: 0.85em; opacity: 0.9;
 }
 .verse-end-group { justify-content: center; align-items: center; height: 100%; align-self: center; }
 
@@ -367,7 +359,7 @@ body {
 .surah-name-latin { font-weight: 600; font-size: 0.85rem; color: var(--text-main); }
 .surah-name-translation { font-weight: 400; font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
 
-.bismillah-header {font-family: 'omar', serif; text-align: center; display: block; font-size: var(--arabic-font-size); margin-top: 10px; margin-bottom: 3px; color: var(--text-main); direction: rtl; }
+.bismillah-header {font-family: 'dkip', serif; text-align: center; display: block; font-size: var(--arabic-font-size); margin-top: 10px; margin-bottom: 3px; color: var(--text-main); direction: rtl; }
 
 .bottom-nav {
     position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);

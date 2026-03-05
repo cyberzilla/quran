@@ -1,5 +1,5 @@
 let appSettings = {
-    font: 'omar',
+    font: 'dkip',
     arabicSize: 1.85,
     wordByWord: false,
     showTransliteration: false,
@@ -1065,7 +1065,7 @@ function changeFontSize(step) {
 }
 
 function applySettings() {
-    document.body.classList.remove('font-omar');
+    document.body.classList.remove('font-dkip');
     document.body.classList.add('font-' + appSettings.font);
     document.documentElement.style.setProperty('--arabic-font-size', appSettings.arabicSize + 'rem');
 }
