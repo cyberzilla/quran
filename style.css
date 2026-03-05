@@ -226,7 +226,7 @@ body {
 }
 .item-title { font-weight: 500; font-size: 0.95rem; color: var(--text-main); margin-bottom: 2px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 .item-subtitle { font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
-.item-arabic { font-family: 'short', serif; font-size: 1.8rem; font-weight: normal; color: var(--primary); }
+.item-arabic { font-family: 'short', serif; font-size: 2.28rem; font-weight: normal; color: var(--primary); }
 
 .sticky-wrapper {
     position: relative; top: 0; z-index: 100; flex: 0 0 auto;
