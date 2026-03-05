@@ -742,7 +742,7 @@ function renderPageContent(pageNumber, forceRender = false) {
                 </div>
             `;
             if (v.surah_number !== 1 && v.surah_number !== 9) {
-                html += `<div class="bismillah-header">﷽</div>`;
+                html += `<div class="bismillah-header">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ</div>`;
             }
         }
 
