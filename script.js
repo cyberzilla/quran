@@ -784,6 +784,7 @@ function renderPageContent(pageNumber, forceRender = false) {
                 } else {
                     html += `<div class="word-group"><div class="word-arabic">${fullArabicText}</div></div>`;
                 }
+                html += `</div>`;
             } else {
                 html += `<div class="verse-text-group"><span class="verse-word">${fullArabicText}</span></div>`;
             }
