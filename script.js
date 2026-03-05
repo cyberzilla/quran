@@ -590,13 +590,17 @@ function renderJuzList() {
             surahName = juzQuery[0].name_latin;
             verseNumber = juzQuery[0].verse_number;
         }
+        let paddedJuz = String(i).padStart(3, '0');
         html += `
             <div class="list-item" onclick="openQuranPage(${startPage})">
-                <div class="item-number" style="font-size: 0.8rem;">Juz<br>${i}</div>
+                <div class="item-number">Juz<br>${i}</div>
+                
                 <div class="item-info">
-                    <div class="juz-title item-title">juz${String(i).padStart(3, '0')}</div>
+                    <div class="juz-title item-title">juz${paddedJuz}</div>
                     <div class="item-subtitle">${surahName} • Ayat ${verseNumber}</div>
                 </div>
+                
+                <div class="first_ayah">j${paddedJuz}</div>
             </div>
         `;
     }
