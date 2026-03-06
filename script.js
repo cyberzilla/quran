@@ -185,7 +185,7 @@ function getTimeAgo(timestamp) {
     return `${years} ${t('year_ago')}`;
 }
 
-// LOGIKA BARU: Merender kurung siku [ ] bertingkat dengan warna berbeda (Nested Regex Parser)
+// Logika Format Footnote Bertingkat
 function formatTranslation(text) {
     if (!text) return "";
     let result = "";
@@ -204,7 +204,6 @@ function formatTranslation(text) {
         }
     }
 
-    // Auto-close tag just in case kurungnya tidak ditutup di database
     while (depth > 0) {
         result += `</span>`;
         depth--;
@@ -1080,13 +1079,20 @@ function closeVersePopup() {
 function openSurahInfoModal(surahId) {
     if (preventNextClick) return;
 
-    const data = execQuery(`SELECT name_latin, name_id FROM surah WHERE id=${surahId}`);
+    // Menarik seluruh kolom dari database untuk mendapatkan long_desc / long_desc_en (jika ada)
+    const data = execQuery(`SELECT * FROM surah WHERE id=${surahId}`);
     if(data.length > 0) {
         const s = data[0];
         const subName = appSettings.appLanguage === 'en' ? s.name_latin : s.name_id;
         document.getElementById('surah-info-title').innerText = `${s.name_latin} (${subName})`;
 
-        let descInfo = s.long_desc ? s.long_desc.replace(/\n/g, '<br><br>') : t('not_available');
+        let descRaw = s.long_desc;
+        // Fallback opsional jika database masa depan mendukung bahasa Inggris untuk deskripsi
+        if (appSettings.appLanguage === 'en' && s.long_desc_en) {
+            descRaw = s.long_desc_en;
+        }
+
+        let descInfo = descRaw ? descRaw.replace(/\n/g, '<br><br>') : t('not_available');
 
         document.getElementById('surah-info-content').innerHTML = descInfo;
         document.getElementById('surah-info-modal').classList.add('active');
