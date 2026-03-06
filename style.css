@@ -383,17 +383,23 @@ body {
 .page-info-pill.interactive { cursor: pointer; transition: background-color 0.2s; }
 .page-info-pill.interactive:active { background-color: var(--border-color); }
 
-/* --- PERBAIKAN ANIMASI COLLAPSE POPUP TERJEMAHAN --- */
+/* --- PERBAIKAN ANIMASI COLLAPSE & PENGEMBALIAN LEBAR --- */
 .verse-popup {
     position: fixed; bottom: 75px; left: 50%; transform: translateX(-50%) translateY(20px);
     background: var(--nav-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border-color); box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     padding: 10px 15px; border-radius: 20px; z-index: 200;
     display: flex; flex-direction: column; align-items: stretch;
-    opacity: 0; visibility: hidden; transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-    width: max-content; min-width: 280px; max-width: 92%;
+    opacity: 0; visibility: hidden;
+
+    /* Mengunci lebar default (compact) secara fix agar bisa dianimasikan */
+    width: 310px;
+    max-width: 92%;
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
 }
 .verse-popup.active { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+.verse-popup.expanded { width: 92%; }
+
 .verse-popup-header { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 15px; }
 .verse-popup-info { display: flex; flex-direction: column; }
 .verse-popup-title { font-weight: 600; font-size: 0.85rem; color: var(--text-main); }
@@ -413,18 +419,13 @@ body {
     overflow-y: auto;
     opacity: 0;
     border-top: 1px solid transparent;
-    /* Transisi diletakkan pada semua properti pembentuk dimensi agar menyusut sempurna */
-    transition: max-height 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-    margin-top 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-    padding-top 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-    opacity 0.3s ease,
-    border-color 0.4s ease;
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
     scrollbar-width: none;
 }
 .verse-popup-translation-container::-webkit-scrollbar { display: none; }
 
 .verse-popup.expanded .verse-popup-translation-container {
-    max-height: 45vh; /* Batas maksimal 45% layar. Jika lebih, otomatis bisa digulir di dalam popup */
+    max-height: 45vh;
     margin-top: 12px;
     padding-top: 12px;
     border-top-color: var(--border-color);
@@ -436,7 +437,7 @@ body {
     line-height: 1.5;
     text-align: left;
 }
-/* --------------------------------------------------- */
+/* -------------------------------------------------------- */
 
 .bookmark-header-actions { padding: 10px 10px 5px 10px; }
 .btn-create-folder {

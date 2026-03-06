@@ -3,7 +3,8 @@ let appSettings = {
     arabicSize: 1.85,
     wordByWord: false,
     showTransliteration: false,
-    translationLang: 'none'
+    translationLang: 'none',
+    timestamp: 0
 };
 
 let db = null;
@@ -24,7 +25,6 @@ let currentViewingFolderId = null;
 let bookmarkToMove = null;
 let confirmCallback = null;
 
-// Variabel baru untuk mengingat status popup terjemahan
 let keepTranslationExpanded = false;
 
 let gotoData = { surah: 1, ayah: 1, page: 1, totalAyahs: 7 };
@@ -759,7 +759,6 @@ function initQuranTrack() {
     setupQuranTouchEvents();
 }
 
-// LOGIKA BARU: Terapkan status (state) expand ke kontainer terjemahan
 function applyTranslationState() {
     const popup = document.getElementById('verse-popup');
     const translateBtn = document.getElementById('vp-btn-translate');
@@ -773,6 +772,13 @@ function applyTranslationState() {
     } else {
         popup.classList.remove('expanded');
         if(translateBtn) translateBtn.classList.remove('active-btn');
+        // Kosongkan teks agar lebar popup bisa kembali ke ukuran asalnya (compact)
+        // Gunakan timeout agar isi dibersihkan setelah animasi max-height (CSS) mengecil sempurna
+        setTimeout(() => {
+            if(!popup.classList.contains('expanded')) {
+                transContainer.innerText = "";
+            }
+        }, 400);
     }
 }
 
@@ -832,22 +838,14 @@ function copyVerseText() {
 }
 
 function togglePopupTranslation() {
-    const popup = document.getElementById('verse-popup');
-    const transContainer = document.getElementById('vp-translation-text');
-    const translateBtn = document.getElementById('vp-btn-translate');
-
     if(!activeVerseData) return;
 
     if (keepTranslationExpanded) {
-        popup.classList.remove('expanded');
-        translateBtn.classList.remove('active-btn');
         keepTranslationExpanded = false;
+        applyTranslationState();
     } else {
-        let text = activeVerseData.translationText.replace(/&quot;/g, '"').replace(/\\'/g, "'");
-        transContainer.innerText = text || "Terjemahan tidak tersedia untuk ayat ini.";
-        popup.classList.add('expanded');
-        translateBtn.classList.add('active-btn');
         keepTranslationExpanded = true;
+        applyTranslationState();
     }
 }
 
@@ -855,7 +853,20 @@ function closeVersePopup() {
     const popup = document.getElementById('verse-popup');
     if(popup) {
         popup.classList.remove('active');
-        // Class 'expanded' tetap dipertahankan saat popup tertutup (hide) agar animasi keluar tidak bentrok
+        popup.classList.remove('expanded');
+
+        const translateBtn = document.getElementById('vp-btn-translate');
+        if(translateBtn) translateBtn.classList.remove('active-btn');
+
+        // Reset memori state ke default agar tertutup ketika buka ayat lain di kemudian waktu
+        keepTranslationExpanded = false;
+
+        setTimeout(() => {
+            const transContainer = document.getElementById('vp-translation-text');
+            if(transContainer && !popup.classList.contains('expanded')) {
+                transContainer.innerText = "";
+            }
+        }, 400);
     }
     activeVerseData = null;
 }
@@ -1199,6 +1210,10 @@ function closeQuran() {
 function openSettings() {
     closeVersePopup();
     document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
+
+    // Perbarui UI pengaturan berdasarkan variabel aktif di memori
+    applySettingsToUI();
+
     document.getElementById('info-sheet').classList.add('expanded');
     checkOverlay();
 }
@@ -1213,6 +1228,18 @@ function checkOverlay() {
     }
 }
 
+function applySettingsToUI() {
+    const fontSelect = document.getElementById('font-select');
+    const togglePerkata = document.getElementById('toggle-perkata');
+    const toggleTransliterasi = document.getElementById('toggle-transliterasi');
+    const selectTranslation = document.getElementById('select-translation');
+
+    if (fontSelect) fontSelect.value = appSettings.font;
+    if (togglePerkata) togglePerkata.checked = appSettings.wordByWord;
+    if (toggleTransliterasi) toggleTransliterasi.checked = appSettings.showTransliteration;
+    if (selectTranslation) selectTranslation.value = appSettings.translationLang;
+}
+
 function updateSettings() {
     const fontSelect = document.getElementById('font-select');
     const togglePerkata = document.getElementById('toggle-perkata');
@@ -1224,7 +1251,9 @@ function updateSettings() {
     if (toggleTransliterasi) appSettings.showTransliteration = toggleTransliterasi.checked;
     if (selectTranslation) appSettings.translationLang = selectTranslation.value;
 
+    appSettings.timestamp = new Date().getTime(); // Mark the update time for Sync
     localStorage.setItem('quran_settings', JSON.stringify(appSettings));
+
     applySettings();
 
     document.querySelectorAll('.quran-page-content').forEach(container => { container.dataset.loaded = "false"; });
@@ -1235,19 +1264,16 @@ function updateSettings() {
         renderPageContent(currentPage - 1, true);
         renderPageContent(currentPage + 1, true);
     }
+
+    if (localStorage.getItem('quran_gdrive_linked') === 'true' && driveAccessToken) {
+        performSync(true);
+    }
 }
 
 function loadSettings() {
     const saved = localStorage.getItem('quran_settings');
     if (saved) appSettings = Object.assign(appSettings, JSON.parse(saved));
-
-    const togglePerkata = document.getElementById('toggle-perkata');
-    if (togglePerkata) togglePerkata.checked = appSettings.wordByWord;
-    const toggleTransliterasi = document.getElementById('toggle-transliterasi');
-    if (toggleTransliterasi) toggleTransliterasi.checked = appSettings.showTransliteration;
-    const selectTranslation = document.getElementById('select-translation');
-    if (selectTranslation) selectTranslation.value = appSettings.translationLang;
-
+    applySettingsToUI();
     applySettings();
 }
 
@@ -1508,7 +1534,7 @@ async function performSync(isSilent = false) {
         if (!searchRes.ok) throw new Error("Gagal mencari file di Google Drive");
         const searchData = await searchRes.json();
 
-        let remoteData = { bookmarks: [], folders: [], lastRead: null };
+        let remoteData = { bookmarks: [], folders: [], lastRead: null, settings: null };
 
         if (searchData.files && searchData.files.length > 0) {
             driveFileId = searchData.files[0].id;
@@ -1526,6 +1552,7 @@ async function performSync(isSilent = false) {
                         remoteData.bookmarks = parsedData.bookmarks || [];
                         remoteData.folders = parsedData.folders || [];
                         remoteData.lastRead = parsedData.lastRead || null;
+                        remoteData.settings = parsedData.settings || null;
                     } catch (e) {
                         console.error("Format JSON file di GDrive tidak valid.", e);
                     }
@@ -1542,6 +1569,14 @@ async function performSync(isSilent = false) {
             }
         }
 
+        if (remoteData.settings) {
+            if (!appSettings.timestamp || (remoteData.settings.timestamp > appSettings.timestamp)) {
+                appSettings = Object.assign(appSettings, remoteData.settings);
+                localStorage.setItem('quran_settings', JSON.stringify(appSettings));
+                applySettingsToUI();
+            }
+        }
+
         saveBookmarks();
         renderBookmarkTab();
 
@@ -1551,7 +1586,12 @@ async function performSync(isSilent = false) {
             else closeFolderView();
         }
 
-        await uploadToDriveRobust({ bookmarks: appBookmarks, folders: appFolders, lastRead: appLastRead });
+        await uploadToDriveRobust({
+            bookmarks: appBookmarks,
+            folders: appFolders,
+            lastRead: appLastRead,
+            settings: appSettings
+        });
 
         const now = new Date();
         const timeString = now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
@@ -1636,8 +1676,6 @@ async function uploadToDriveRobust(dataObj) {
 
 /* =========================================
    PWA GESTURE PREVENTION FALLBACK
-   Mencegah Edge Swipe Navigation & Pull-to-refresh
-   Secara Aman Tanpa Mengunci Scroll Biasa
 ========================================= */
 let pwaTouchStartX = 0;
 let pwaTouchStartY = 0;
