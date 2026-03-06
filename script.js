@@ -18,7 +18,7 @@ let preventNextClick = false;
 
 let appBookmarks = [];
 let appFolders = [];
-let appLastRead = null; // Menyimpan data history last read
+let appLastRead = null;
 let activeVerseData = null;
 let currentViewingFolderId = null;
 let bookmarkToMove = null;
@@ -165,10 +165,8 @@ async function initApp() {
     const isDbDownloaded = localStorage.getItem('is_db_downloaded');
 
     try {
-        // --- 1. MEMUAT ASET FONT TERLEBIH DAHULU ---
         if (loaderText) loaderText.innerText = "MEMUAT ASET FONT...";
         try {
-            // Memaksa browser menunggu sampai font kustom selesai di-load di memori
             await Promise.all([
                 document.fonts.load("12px dkip"),
                 document.fonts.load("12px juz"),
@@ -179,7 +177,6 @@ async function initApp() {
             console.warn("Beberapa font mungkin memakan waktu lebih lama untuk dimuat.", fontErr);
         }
 
-        // --- 2. MEMUAT MESIN DATABASE ---
         if (loaderText) loaderText.innerText = "MEMUAT MESIN DATABASE...";
         const SQL = await initSqlJs({ locateFile: file => `${file}` });
 
@@ -271,6 +268,19 @@ function setupSwipeTabs() {
         touchStartX = e.changedTouches[0].clientX;
         touchStartY = e.changedTouches[0].clientY;
     }, {passive: true});
+
+    // Mencegah Browser Default Horizontal Swipe Action (Back/Forward Navigation)
+    swipeArea.addEventListener('touchmove', e => {
+        let touchCurrentX = e.changedTouches[0].clientX;
+        let touchCurrentY = e.changedTouches[0].clientY;
+        let diffX = touchCurrentX - touchStartX;
+        let diffY = touchCurrentY - touchStartY;
+
+        // Jika user dominan mengusap ke kiri/kanan di area tab, gagalkan navigasi browser!
+        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 5) {
+            if (e.cancelable) e.preventDefault();
+        }
+    }, {passive: false});
 
     swipeArea.addEventListener('touchend', e => {
         let touchEndX = e.changedTouches[0].clientX;
@@ -413,7 +423,7 @@ function moveBookmark(id, dir) {
     }
 }
 
-const iconProps = 'width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const iconProps = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 const svgUp = `<svg ${iconProps}><path d="M18 15l-6-6-6 6"/></svg>`;
 const svgDown = `<svg ${iconProps}><path d="M6 9l6 6 6-6"/></svg>`;
 const svgFolder = `<svg ${iconProps}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
@@ -429,7 +439,7 @@ function renderBookmarkTab() {
         lastReadContainer.innerHTML = `
             <div class="list-item" style="border-left: 4px solid var(--primary);" onclick="openQuranPage(${appLastRead.pageNumber}, ${appLastRead.surahId}, ${appLastRead.verseId}, 'lastread')">
                 <div class="item-number" style="background:var(--primary-light); color:var(--primary);">
-                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                 </div>
                 <div class="item-info">
                     <div class="item-title">${appLastRead.surahName}</div>
@@ -457,7 +467,7 @@ function renderBookmarkTab() {
         folderHtml += `
             <div class="list-item folder-item" onclick="openFolderView('${folder.id}', '${folder.name}')">
                 <div class="item-number" style="background:var(--primary); color:white;">
-                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                 </div>
                 <div class="item-info">
                     <div class="item-title">${folder.name}</div>
@@ -483,7 +493,7 @@ function renderBookmarkTab() {
     } else {
         if (titleSemua) titleSemua.style.display = 'none';
         if (visibleFolders.length === 0 && !appLastRead) {
-            bookmarkList.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted);">Library Anda masih kosong.</div>';
+            bookmarkList.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted); font-size: 0.8rem;">Library Anda masih kosong.</div>';
             return;
         } else {
             bookmarkList.innerHTML = '';
@@ -494,7 +504,7 @@ function renderBookmarkTab() {
     rootBookmarks.forEach(bm => {
         bHtml += `
             <div class="list-item" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
-                <div class="item-number" style="font-size: 0.8rem;">Hal<br>${bm.pageNumber}</div>
+                <div class="item-number" style="font-size: 0.7rem;">Hal<br>${bm.pageNumber}</div>
                 <div class="item-info">
                     <div class="item-title">${bm.surahName}</div>
                     <div class="item-subtitle">Ayat ${bm.verseId}</div>
@@ -579,7 +589,7 @@ function openFolderView(folderId, folderName) {
     const folderBookmarks = appBookmarks.filter(b => b.folderId === folderId && !b.deleted);
 
     if(folderBookmarks.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted);">Folder ini kosong.</div>';
+        container.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted); font-size: 0.8rem;">Folder ini kosong.</div>';
         return;
     }
 
@@ -608,9 +618,9 @@ function openFolderView(folderId, folderName) {
         }
 
         html += `
-            <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:12px; padding: 15px;" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
+            <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:10px; padding: 12px;" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
                 <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-                    <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">${bm.surahName} : ${bm.verseId}</div>
+                    <div style="font-weight:700; color:var(--primary); font-size:0.85rem;">${bm.surahName} : ${bm.verseId}</div>
                     <div class="action-group">
                         <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', -1)">${svgUp}</button>
                         <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', 1)">${svgDown}</button>
@@ -839,7 +849,7 @@ function renderPageContent(pageNumber, forceRender = false) {
     `);
 
     if (verses.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:50px; color: var(--text-muted);">Data tidak ditemukan.</div>';
+        container.innerHTML = '<div style="text-align:center; padding:50px; color: var(--text-muted); font-size: 0.8rem;">Data tidak ditemukan.</div>';
         return;
     }
 
@@ -989,8 +999,8 @@ function updateQuranUI() {
         const juzString = Array.from(juzSet).join('-');
 
         headerText = `
-            <span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.7rem;">${surahString}</span>
-            <span style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-top: 2px;">
+            <span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem;">${surahString}</span>
+            <span style="display: block; font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-top: 2px;">
                 ${juzString ? 'Juz ' + juzString : ''}
             </span>
         `;
@@ -1398,7 +1408,7 @@ function updateSyncButtonUI() {
 
     const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
     if (isLinked) {
-        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg> Sinkronisasi`;
+        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 3px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg> Sinkronisasi`;
         btn.style.backgroundColor = '#10b981';
 
         if (infoContainer) {
@@ -1429,7 +1439,6 @@ function handleAuthClick() {
     }
 }
 
-// Tambahkan parameter isSilent agar bisa dipanggil tanpa memunculkan toast notifikasi (untuk background sync)
 async function performSync(isSilent = false) {
     try {
         const queryStr = encodeURIComponent("name='quran_sync.json'");
@@ -1455,7 +1464,6 @@ async function performSync(isSilent = false) {
                 if (text && text.trim() !== "") {
                     try {
                         let parsedData = JSON.parse(text);
-                        // Parsing spesifik untuk mencegah override undefined dari struktur JSON lama
                         remoteData.bookmarks = parsedData.bookmarks || [];
                         remoteData.folders = parsedData.folders || [];
                         remoteData.lastRead = parsedData.lastRead || null;
@@ -1469,9 +1477,7 @@ async function performSync(isSilent = false) {
         appBookmarks = mergeSyncData(appBookmarks, remoteData.bookmarks);
         appFolders = mergeSyncData(appFolders, remoteData.folders);
 
-        // Logika Sinkronisasi Khusus Terakhir Dibaca
         if (remoteData.lastRead) {
-            // Timpa dengan data remote JIKA data lokal kosong, ATAU data remote lebih baru
             if (!appLastRead || (remoteData.lastRead.timestamp > appLastRead.timestamp)) {
                 appLastRead = remoteData.lastRead;
             }
@@ -1568,3 +1574,33 @@ async function uploadToDriveRobust(dataObj) {
         localStorage.setItem('quran_drive_file_id', driveFileId);
     }
 }
+
+/* =========================================
+   PWA GESTURE PREVENTION FALLBACK
+   Mencegah Edge Swipe Navigation & Pull-to-refresh
+   Secara Penuh di iOS/Safari Lawas
+========================================= */
+let pwaTouchStartX = 0;
+let pwaTouchStartY = 0;
+
+document.addEventListener('touchstart', e => {
+    pwaTouchStartX = e.touches[0].clientX;
+    pwaTouchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+    // 1. Mencegah Edge Swipe (Kembali/Maju di browser) jika usapan berawal dari sisi <20px atau sisi Kanan
+    if (pwaTouchStartX < 20 || pwaTouchStartX > window.innerWidth - 20) {
+        if (e.cancelable) e.preventDefault();
+    }
+
+    // 2. Mencegah Pull-to-Refresh ekstra jika overscroll-behavior CSS diabaikan
+    const touchCurrentY = e.touches[0].clientY;
+    if (touchCurrentY > pwaTouchStartY) { // Jika layar sedang ditarik ke bawah
+        const scrollable = e.target.closest('.tab-pane') || e.target.closest('.quran-page-content') || e.target.closest('.sheet-content');
+        // Jika sedang ditarik ke bawah dan tidak ada lagi ruang scroll di atasnya (posisi scrollTop 0)
+        if (!scrollable || scrollable.scrollTop <= 0) {
+            if (e.cancelable) e.preventDefault();
+        }
+    }
+}, { passive: false });
