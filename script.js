@@ -151,9 +151,8 @@ function setLastRead() {
     closeVersePopup();
     document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
 
-    // Auto-Sync background khusus untuk Last Read agar mulus di device lain
     if (localStorage.getItem('quran_gdrive_linked') === 'true' && driveAccessToken) {
-        performSync(true); // Memanggil sync secara silent (tanpa toast notifikasi kecuali gagal)
+        performSync(true);
     }
 }
 
@@ -166,8 +165,22 @@ async function initApp() {
     const isDbDownloaded = localStorage.getItem('is_db_downloaded');
 
     try {
-        if (loaderText) loaderText.innerText = "MEMUAT MESIN DATABASE...";
+        // --- 1. MEMUAT ASET FONT TERLEBIH DAHULU ---
+        if (loaderText) loaderText.innerText = "MEMUAT ASET FONT...";
+        try {
+            // Memaksa browser menunggu sampai font kustom selesai di-load di memori
+            await Promise.all([
+                document.fonts.load("12px dkip"),
+                document.fonts.load("12px juz"),
+                document.fonts.load("12px short"),
+                document.fonts.load("12px long")
+            ]);
+        } catch (fontErr) {
+            console.warn("Beberapa font mungkin memakan waktu lebih lama untuk dimuat.", fontErr);
+        }
 
+        // --- 2. MEMUAT MESIN DATABASE ---
+        if (loaderText) loaderText.innerText = "MEMUAT MESIN DATABASE...";
         const SQL = await initSqlJs({ locateFile: file => `${file}` });
 
         if (loaderText) {
@@ -175,16 +188,13 @@ async function initApp() {
             else loaderText.innerText = "MEMUAT DATABASE LOKAL...";
         }
 
-        // === PERUBAHAN: Memanggil file GZIP dan mengekstraknya menggunakan DecompressionStream ===
         const response = await fetch('quran.sqlite.gz');
         if (!response.ok) throw new Error("File quran.sqlite.gz tidak ditemukan.");
 
-        // Melakukan dekompresi gzip (Native Browser API)
         const ds = new DecompressionStream('gzip');
         const decompressedStream = response.body.pipeThrough(ds);
         const decompressedResponse = new Response(decompressedStream);
         const buffer = await decompressedResponse.arrayBuffer();
-        // =========================================================================================
 
         db = new SQL.Database(new Uint8Array(buffer));
 
@@ -1419,6 +1429,7 @@ function handleAuthClick() {
     }
 }
 
+// Tambahkan parameter isSilent agar bisa dipanggil tanpa memunculkan toast notifikasi (untuk background sync)
 async function performSync(isSilent = false) {
     try {
         const queryStr = encodeURIComponent("name='quran_sync.json'");

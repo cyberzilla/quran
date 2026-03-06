@@ -1,10 +1,9 @@
 @font-face {
     font-family: 'dkip';
     src: url('./dkip.woff2') format('woff2');
-    /*src: url('./dkip.otf') format('opentype');*/
     font-weight: normal;
     font-style: normal;
-    font-display: swap;
+    font-display: block; /* Mencegah FOUT (huruf aneh sebelum font siap) */
 }
 
 @font-face {
@@ -12,7 +11,7 @@
     src: url('./juz.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
-    font-display: swap;
+    font-display: block;
 }
 
 @font-face {
@@ -20,7 +19,7 @@
     src: url('./short.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
-    font-display: swap;
+    font-display: block;
 }
 
 @font-face {
@@ -28,7 +27,7 @@
     src: url('./long.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
-    font-display: swap;
+    font-display: block;
 }
 
 /* Font Inter Regular */
@@ -37,7 +36,7 @@
     src: url('./inter-regular.woff2') format('woff2');
     font-weight: 400;
     font-style: normal;
-    font-display: swap;
+    font-display: block;
 }
 
 /* Font Inter Semi-Bold */
@@ -46,7 +45,7 @@
     src: url('./inter-semibold.woff2') format('woff2');
     font-weight: 600;
     font-style: normal;
-    font-display: swap;
+    font-display: block;
 }
 
 body.font-dkip .arabic, body.font-dkip .word-arabic { font-family: 'dkip', serif; }
