@@ -3,7 +3,7 @@ let appSettings = {
     arabicSize: 1.85,
     wordByWord: false,
     showTransliteration: false,
-    showTranslation: true,
+    showTranslation: false,
     appLanguage: 'id',
     timestamp: 0
 };
@@ -185,10 +185,32 @@ function getTimeAgo(timestamp) {
     return `${years} ${t('year_ago')}`;
 }
 
-// Fungsi Formatter Footnote: Mengubah [[...]] menjadi element span.footnote
+// LOGIKA BARU: Merender kurung siku [ ] bertingkat dengan warna berbeda (Nested Regex Parser)
 function formatTranslation(text) {
     if (!text) return "";
-    return text.replace(/\[\[([\s\S]*?)\]\]/g, '<span class="footnote">[$1]</span>');
+    let result = "";
+    let depth = 0;
+
+    for (let i = 0; i < text.length; i++) {
+        if (text[i] === '[') {
+            depth++;
+            let dClass = depth > 4 ? 4 : depth;
+            result += `<span class="footnote fn-d${dClass}">[`;
+        } else if (text[i] === ']') {
+            result += `]</span>`;
+            if (depth > 0) depth--;
+        } else {
+            result += text[i];
+        }
+    }
+
+    // Auto-close tag just in case kurungnya tidak ditutup di database
+    while (depth > 0) {
+        result += `</span>`;
+        depth--;
+    }
+
+    return result;
 }
 // =========================================
 
@@ -953,7 +975,6 @@ function applyTranslationState() {
 
     if (keepTranslationExpanded && activeVerseData) {
         let text = activeVerseData.translationText.replace(/&quot;/g, '"').replace(/\\'/g, "'");
-        // Gunakan innerHTML agar tag span.footnote dari regex bisa dirender
         transContainer.innerHTML = formatTranslation(text) || t('no_translation');
         popup.classList.add('expanded');
         if(translateBtn) translateBtn.classList.add('active-btn');
@@ -1454,7 +1475,6 @@ function updateSettings() {
         renderPageContent(currentPage - 1, true);
         renderPageContent(currentPage + 1, true);
 
-        // Memperbarui UI Al-Qur'an agar label "Hal/Page" ikut berganti seketika
         updateQuranUI();
     } else {
         renderSurahList();
