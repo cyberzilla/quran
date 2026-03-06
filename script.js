@@ -175,10 +175,17 @@ async function initApp() {
             else loaderText.innerText = "MEMUAT DATABASE LOKAL...";
         }
 
-        const response = await fetch('quran.sqlite');
-        if (!response.ok) throw new Error("File quran.sqlite tidak ditemukan.");
+        // === PERUBAHAN: Memanggil file GZIP dan mengekstraknya menggunakan DecompressionStream ===
+        const response = await fetch('quran.sqlite.gz');
+        if (!response.ok) throw new Error("File quran.sqlite.gz tidak ditemukan.");
 
-        const buffer = await response.arrayBuffer();
+        // Melakukan dekompresi gzip (Native Browser API)
+        const ds = new DecompressionStream('gzip');
+        const decompressedStream = response.body.pipeThrough(ds);
+        const decompressedResponse = new Response(decompressedStream);
+        const buffer = await decompressedResponse.arrayBuffer();
+        // =========================================================================================
+
         db = new SQL.Database(new Uint8Array(buffer));
 
         if (!isDbDownloaded) localStorage.setItem('is_db_downloaded', 'true');
@@ -199,7 +206,7 @@ async function initApp() {
     } catch (error) {
         console.error("Error App:", error);
         if (loaderText) loaderText.innerText = "GAGAL MEMUAT DATABASE";
-        alert("Pastikan file 'quran.sqlite' berada di folder yang sama dan koneksi internet stabil.");
+        alert("Pastikan file 'quran.sqlite.gz' berada di folder yang sama dan browser mendukung DecompressionStream.");
     } finally {
         setTimeout(() => {
             const loader = document.getElementById('global-loader');
@@ -1412,7 +1419,6 @@ function handleAuthClick() {
     }
 }
 
-// Tambahkan parameter isSilent agar bisa dipanggil tanpa memunculkan toast notifikasi (untuk background sync)
 async function performSync(isSilent = false) {
     try {
         const queryStr = encodeURIComponent("name='quran_sync.json'");

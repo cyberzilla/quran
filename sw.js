@@ -1,4 +1,4 @@
-const CACHE_NAME = 'quran-pwa-v2';
+const CACHE_NAME = 'quran-pwa-v4';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -7,7 +7,7 @@ const ASSETS_TO_CACHE = [
     './manifest.json',
     './icon-512.png',
     './icon-192.png',
-    './quran.sqlite',
+    './quran.sqlite.gz',
     './sql-wasm.js',
     './sql-wasm.wasm',
     './dkip.woff2',
@@ -27,6 +27,9 @@ self.addEventListener('install', event => {
                 return cache.addAll(ASSETS_TO_CACHE);
             })
             .then(() => self.skipWaiting())
+            .catch(error => {
+                console.error('Gagal menyimpan cache, periksa kembali apakah ada nama file yang typo atau 404:', error);
+            })
     );
 });
 
