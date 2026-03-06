@@ -24,6 +24,9 @@ let currentViewingFolderId = null;
 let bookmarkToMove = null;
 let confirmCallback = null;
 
+// Variabel baru untuk mengingat status popup terjemahan
+let keepTranslationExpanded = false;
+
 let gotoData = { surah: 1, ayah: 1, page: 1, totalAyahs: 7 };
 
 if ('serviceWorker' in navigator) {
@@ -275,7 +278,6 @@ function setupSwipeTabs() {
         let diffX = touchCurrentX - touchStartX;
         let diffY = touchCurrentY - touchStartY;
 
-        // Hanya cegah aksi jika gerakan dominan horizontal
         if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 5) {
             if (e.cancelable) e.preventDefault();
         }
@@ -757,6 +759,23 @@ function initQuranTrack() {
     setupQuranTouchEvents();
 }
 
+// LOGIKA BARU: Terapkan status (state) expand ke kontainer terjemahan
+function applyTranslationState() {
+    const popup = document.getElementById('verse-popup');
+    const translateBtn = document.getElementById('vp-btn-translate');
+    const transContainer = document.getElementById('vp-translation-text');
+
+    if (keepTranslationExpanded && activeVerseData) {
+        let text = activeVerseData.translationText.replace(/&quot;/g, '"').replace(/\\'/g, "'");
+        transContainer.innerText = text || "Terjemahan tidak tersedia untuk ayat ini.";
+        popup.classList.add('expanded');
+        if(translateBtn) translateBtn.classList.add('active-btn');
+    } else {
+        popup.classList.remove('expanded');
+        if(translateBtn) translateBtn.classList.remove('active-btn');
+    }
+}
+
 function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, translationText, element) {
     if (preventNextClick) return;
 
@@ -770,6 +789,8 @@ function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, t
             const subtitleEl = document.getElementById('vp-subtitle');
             if(titleEl) titleEl.innerText = surahName;
             if(subtitleEl) subtitleEl.innerText = `Ayat ${verseId}`;
+
+            applyTranslationState();
             popup.classList.add('active');
             return;
         } else {
@@ -791,6 +812,8 @@ function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, t
         const subtitleEl = document.getElementById('vp-subtitle');
         if(titleEl) titleEl.innerText = surahName;
         if(subtitleEl) subtitleEl.innerText = `Ayat ${verseId}`;
+
+        applyTranslationState();
         popup.classList.add('active');
     }
 }
@@ -808,9 +831,32 @@ function copyVerseText() {
     });
 }
 
+function togglePopupTranslation() {
+    const popup = document.getElementById('verse-popup');
+    const transContainer = document.getElementById('vp-translation-text');
+    const translateBtn = document.getElementById('vp-btn-translate');
+
+    if(!activeVerseData) return;
+
+    if (keepTranslationExpanded) {
+        popup.classList.remove('expanded');
+        translateBtn.classList.remove('active-btn');
+        keepTranslationExpanded = false;
+    } else {
+        let text = activeVerseData.translationText.replace(/&quot;/g, '"').replace(/\\'/g, "'");
+        transContainer.innerText = text || "Terjemahan tidak tersedia untuk ayat ini.";
+        popup.classList.add('expanded');
+        translateBtn.classList.add('active-btn');
+        keepTranslationExpanded = true;
+    }
+}
+
 function closeVersePopup() {
     const popup = document.getElementById('verse-popup');
-    if(popup) popup.classList.remove('active');
+    if(popup) {
+        popup.classList.remove('active');
+        // Class 'expanded' tetap dipertahankan saat popup tertutup (hide) agar animasi keluar tidak bentrok
+    }
     activeVerseData = null;
 }
 
@@ -880,8 +926,6 @@ function renderPageContent(pageNumber, forceRender = false) {
         let fullArabicText = v.arabic_text || '';
         let textForCopy = fullArabicText;
 
-        // --- PENGHAPUSAN NOMOR AYAT UNTUK COPY AYAT ---
-        // Dengan menggunakan arabic_words kita bisa membuang word terakhir yang berisi ornamen ayat
         try {
             let arWords = JSON.parse(v.arabic_words || "[]");
             if (arWords.length > 0) {
@@ -889,14 +933,12 @@ function renderPageContent(pageNumber, forceRender = false) {
             }
         } catch (e) {}
 
-        // Handle Bismillah (Hapus teks Bismillah di ayat 1, kecuali Al-Fatihah)
         if (v.surah_number !== 1 && v.surah_number !== 9 && v.verse_number === 1) {
             const bismillahs = ["بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ ", "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ ", "بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ", "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"];
             bismillahs.forEach(b => {
                 if (fullArabicText.startsWith(b)) fullArabicText = fullArabicText.replace(b, "").trim();
                 if (textForCopy.startsWith(b)) textForCopy = textForCopy.replace(b, "").trim();
             });
-            // Tetap render Bismillah secara visual di Header
             html += `<div class="bismillah-header">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ</div>`;
         }
 
@@ -933,11 +975,11 @@ function renderPageContent(pageNumber, forceRender = false) {
                 html += `</div>`;
             } else {
                 html += `<div class="verse-text-group"><span class="verse-word">${fullArabicText}</span></div>`;
+                if (appSettings.showTransliteration) html += `<div class="verse-transliteration">${v.transliteration || ''}</div>`;
+                if (appSettings.translationLang === 'id') html += `<div class="verse-translation">${v.translation_id || ''}</div>`;
+                else if (appSettings.translationLang === 'en') html += `<div class="verse-translation">${v.translation_en || ''}</div>`;
             }
 
-            if (appSettings.showTransliteration) html += `<div class="verse-transliteration">${v.transliteration || ''}</div>`;
-            if (appSettings.translationLang === 'id') html += `<div class="verse-translation">${v.translation_id || ''}</div>`;
-            else if (appSettings.translationLang === 'en') html += `<div class="verse-translation">${v.translation_en || ''}</div>`;
             html += `</div>`;
         }
     });
@@ -1154,7 +1196,13 @@ function closeQuran() {
     localStorage.removeItem('quran_is_reading');
 }
 
-function openSettings() { document.getElementById('info-sheet').classList.add('expanded'); checkOverlay(); }
+function openSettings() {
+    closeVersePopup();
+    document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
+    document.getElementById('info-sheet').classList.add('expanded');
+    checkOverlay();
+}
+
 function closeAllSheets() { document.getElementById('info-sheet').classList.remove('expanded'); checkOverlay(); }
 function checkOverlay() {
     const isExp = document.getElementById('info-sheet').classList.contains('expanded');
@@ -1605,20 +1653,15 @@ document.addEventListener('touchmove', e => {
     const diffX = touchCurrentX - pwaTouchStartX;
     const diffY = touchCurrentY - pwaTouchStartY;
 
-    // 1. Jika gerakan tangan dominan HORIZONTAL (kiri/kanan)
     if (Math.abs(diffX) > Math.abs(diffY)) {
-        // Blokir navigasi kembali/maju di browser HANYA jika usapan berawal dari ujung layar
         if (pwaTouchStartX < 20 || pwaTouchStartX > window.innerWidth - 20) {
             if (e.cancelable) e.preventDefault();
         }
     }
-    // 2. Jika gerakan tangan dominan VERTIKAL (atas/bawah)
     else {
-        if (diffY > 0) { // Jika jari ditarik ke bawah (Mencoba pull-to-refresh)
-            // Target di bawah adalah elemen-elemen yang memiliki sifat scrolling
-            const scrollable = e.target.closest('.tab-pane, .slide-card, .sheet-content, #surah-info-content, .edit-words-container, .move-folder-list, .goto-list');
+        if (diffY > 0) {
+            const scrollable = e.target.closest('.tab-pane, .slide-card, .sheet-content, #surah-info-content, .edit-words-container, .move-folder-list, .goto-list, .verse-popup-translation-container');
 
-            // Jika tidak ada elemen yang bisa di-scroll, atau jika elemen tersebut posisinya ada di mentok atas
             if (!scrollable || scrollable.scrollTop <= 0) {
                 if (e.cancelable) e.preventDefault();
             }
