@@ -269,14 +269,13 @@ function setupSwipeTabs() {
         touchStartY = e.changedTouches[0].clientY;
     }, {passive: true});
 
-    // Mencegah Browser Default Horizontal Swipe Action (Back/Forward Navigation)
     swipeArea.addEventListener('touchmove', e => {
         let touchCurrentX = e.changedTouches[0].clientX;
         let touchCurrentY = e.changedTouches[0].clientY;
         let diffX = touchCurrentX - touchStartX;
         let diffY = touchCurrentY - touchStartY;
 
-        // Jika user dominan mengusap ke kiri/kanan di area tab, gagalkan navigasi browser!
+        // Hanya cegah aksi jika gerakan dominan horizontal
         if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 5) {
             if (e.cancelable) e.preventDefault();
         }
@@ -1578,7 +1577,7 @@ async function uploadToDriveRobust(dataObj) {
 /* =========================================
    PWA GESTURE PREVENTION FALLBACK
    Mencegah Edge Swipe Navigation & Pull-to-refresh
-   Secara Penuh di iOS/Safari Lawas
+   Secara Aman Tanpa Mengunci Scroll Biasa
 ========================================= */
 let pwaTouchStartX = 0;
 let pwaTouchStartY = 0;
@@ -1589,18 +1588,28 @@ document.addEventListener('touchstart', e => {
 }, { passive: true });
 
 document.addEventListener('touchmove', e => {
-    // 1. Mencegah Edge Swipe (Kembali/Maju di browser) jika usapan berawal dari sisi <20px atau sisi Kanan
-    if (pwaTouchStartX < 20 || pwaTouchStartX > window.innerWidth - 20) {
-        if (e.cancelable) e.preventDefault();
-    }
-
-    // 2. Mencegah Pull-to-Refresh ekstra jika overscroll-behavior CSS diabaikan
+    const touchCurrentX = e.touches[0].clientX;
     const touchCurrentY = e.touches[0].clientY;
-    if (touchCurrentY > pwaTouchStartY) { // Jika layar sedang ditarik ke bawah
-        const scrollable = e.target.closest('.tab-pane') || e.target.closest('.quran-page-content') || e.target.closest('.sheet-content');
-        // Jika sedang ditarik ke bawah dan tidak ada lagi ruang scroll di atasnya (posisi scrollTop 0)
-        if (!scrollable || scrollable.scrollTop <= 0) {
+    const diffX = touchCurrentX - pwaTouchStartX;
+    const diffY = touchCurrentY - pwaTouchStartY;
+
+    // 1. Jika gerakan tangan dominan HORIZONTAL (kiri/kanan)
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+        // Blokir navigasi kembali/maju di browser HANYA jika usapan berawal dari ujung layar
+        if (pwaTouchStartX < 20 || pwaTouchStartX > window.innerWidth - 20) {
             if (e.cancelable) e.preventDefault();
+        }
+    }
+    // 2. Jika gerakan tangan dominan VERTIKAL (atas/bawah)
+    else {
+        if (diffY > 0) { // Jika jari ditarik ke bawah (Mencoba pull-to-refresh)
+            // Menentukan elemen mana yang sebenarnya sedang di-scroll oleh pengguna
+            const scrollable = e.target.closest('.tab-pane') || e.target.closest('.slide-card') || e.target.closest('.sheet-content');
+
+            // Jika elemen tersebut sudah mentok di paling atas (atau tidak ada), matikan aksi pull-to-refresh bawaan HP
+            if (!scrollable || scrollable.scrollTop <= 0) {
+                if (e.cancelable) e.preventDefault();
+            }
         }
     }
 }, { passive: false });
