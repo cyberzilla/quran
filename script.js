@@ -875,21 +875,33 @@ function renderPageContent(pageNumber, forceRender = false) {
                     <div class="surah-col-right">${v.location}</div>
                 </div>
             `;
-            if (v.surah_number !== 1 && v.surah_number !== 9) {
-                html += `<div class="bismillah-header">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ</div>`;
-            }
         }
 
         let fullArabicText = v.arabic_text || '';
-        if (v.surah_number !== 1 && v.verse_number === 1) {
-            const bismillahs = ["بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ ", "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ "];
+        let textForCopy = fullArabicText;
+
+        // --- PENGHAPUSAN NOMOR AYAT UNTUK COPY AYAT ---
+        // Dengan menggunakan arabic_words kita bisa membuang word terakhir yang berisi ornamen ayat
+        try {
+            let arWords = JSON.parse(v.arabic_words || "[]");
+            if (arWords.length > 0) {
+                textForCopy = arWords.slice(0, -1).join(' ');
+            }
+        } catch (e) {}
+
+        // Handle Bismillah (Hapus teks Bismillah di ayat 1, kecuali Al-Fatihah)
+        if (v.surah_number !== 1 && v.surah_number !== 9 && v.verse_number === 1) {
+            const bismillahs = ["بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ ", "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ ", "بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ", "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"];
             bismillahs.forEach(b => {
-                if (fullArabicText.startsWith(b)) fullArabicText = fullArabicText.replace(b, "");
+                if (fullArabicText.startsWith(b)) fullArabicText = fullArabicText.replace(b, "").trim();
+                if (textForCopy.startsWith(b)) textForCopy = textForCopy.replace(b, "").trim();
             });
+            // Tetap render Bismillah secara visual di Header
+            html += `<div class="bismillah-header">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ</div>`;
         }
 
         const safeSurahName = v.name_latin.replace(/'/g, "\\'");
-        const cleanArabicForCopy = fullArabicText.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const cleanArabicForCopy = textForCopy.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         const cleanTranslationForCopy = (v.translation_id || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
         const verseElId = `verse-wrap-${v.surah_number}-${v.verse_number}`;
 
@@ -1603,10 +1615,10 @@ document.addEventListener('touchmove', e => {
     // 2. Jika gerakan tangan dominan VERTIKAL (atas/bawah)
     else {
         if (diffY > 0) { // Jika jari ditarik ke bawah (Mencoba pull-to-refresh)
-            // Menentukan elemen mana yang sebenarnya sedang di-scroll oleh pengguna
-            const scrollable = e.target.closest('.tab-pane') || e.target.closest('.slide-card') || e.target.closest('.sheet-content');
+            // Target di bawah adalah elemen-elemen yang memiliki sifat scrolling
+            const scrollable = e.target.closest('.tab-pane, .slide-card, .sheet-content, #surah-info-content, .edit-words-container, .move-folder-list, .goto-list');
 
-            // Jika elemen tersebut sudah mentok di paling atas (atau tidak ada), matikan aksi pull-to-refresh bawaan HP
+            // Jika tidak ada elemen yang bisa di-scroll, atau jika elemen tersebut posisinya ada di mentok atas
             if (!scrollable || scrollable.scrollTop <= 0) {
                 if (e.cancelable) e.preventDefault();
             }
