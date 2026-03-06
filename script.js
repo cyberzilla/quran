@@ -3,9 +3,194 @@ let appSettings = {
     arabicSize: 1.85,
     wordByWord: false,
     showTransliteration: false,
-    translationLang: 'none',
+    showTranslation: true,
+    appLanguage: 'id',
     timestamp: 0
 };
+
+// =========================================
+// KAMUS LOKALISASI (i18n Dictionary)
+// =========================================
+const i18n = {
+    id: {
+        tab_surah: "Surah",
+        tab_juz: "Juz",
+        tab_library: "Library",
+        search_placeholder: "Cari Surah, Nama Arab, atau Terjemahan...",
+        loading_assets: "MEMUAT ASET FONT...",
+        loading_db_engine: "MEMUAT MESIN DATABASE...",
+        downloading_db: "MENGUNDUH DATA AL-QUR'AN...",
+        loading_local_db: "MEMUAT DATABASE LOKAL...",
+        db_failed: "GAGAL MEMUAT DATABASE",
+        sync_google: "Sync Google",
+        create_folder: "+ Buat Folder",
+        last_read: "Terakhir Dibaca",
+        folder: "Folder",
+        all_bookmarks: "Semua Bookmark",
+        empty_folder: "Folder ini kosong.",
+        empty_library: "Library Anda masih kosong.",
+        saved_ayah: "Ayat tersimpan",
+        page: "Hal",
+        ayah: "Ayat",
+        juz: "Juz",
+        no_translation: "Terjemahan tidak tersedia untuk ayat ini.",
+        bookmark_added: "Bookmark berhasil ditambahkan",
+        bookmark_removed: "Bookmark berhasil dihapus",
+        folder_created: "Folder berhasil dibuat",
+        folder_deleted: "Folder beserta isinya berhasil dihapus",
+        bookmark_moved: "Bookmark dipindahkan",
+        last_read_marked: "Ditandai sebagai Terakhir Dibaca",
+        copied: "Ayat berhasil disalin",
+        copy_failed: "Gagal menyalin",
+        delete_bookmark_title: "Hapus Bookmark",
+        delete_bookmark_msg: "Apakah Anda yakin ingin menghapus bookmark ini?",
+        delete_folder_title: "Hapus Folder",
+        delete_folder_msg: "Apakah Anda yakin ingin menghapus folder ini beserta seluruh bookmark di dalamnya?",
+        cancel: "Batal",
+        delete: "Hapus",
+        save: "Simpan",
+        goto: "Go To",
+        close: "Tutup",
+        move_bookmark_title: "Pindahkan Bookmark",
+        create_folder_title: "Buat Folder Baru",
+        folder_name_placeholder: "Nama Folder...",
+        root_folder: "-- Tanpa Folder (Root) --",
+        goto_title: "Pindah Halaman",
+        edit_words_title: "Tampilkan/Sembunyikan Kata",
+        edit_words_desc: "Ketuk kata untuk menyembunyikan atau menampilkannya.",
+        surah_info_title: "Informasi Surah",
+        not_available: "Informasi detail untuk surah ini belum tersedia.",
+        data_not_found: "Data tidak ditemukan.",
+        settings_title: "Pengaturan Membaca",
+        mode_perkata: "Mode Perkata",
+        transliteration: "Transliterasi (Latin)",
+        show_translation: "Tampilkan Terjemahan",
+        app_language: "Bahasa / Language",
+        arabic_font_size: "Ukuran Font Arab",
+        sync_not_ready: "Sistem Sinkronisasi belum siap. Coba sebentar lagi.",
+        syncing: "Menyinkronkan Data...",
+        auth_google: "Meminta akses ke Google...",
+        sync_success: "Sinkronisasi Berhasil!",
+        sync_failed: "Gagal melakukan sinkronisasi: ",
+        connected: "Terhubung: ",
+        last_sync: "Terakhir Sync: ",
+        waiting_info: "Menunggu Info...",
+        never_sync: "Belum pernah",
+        just_now: "Baru saja",
+        min_ago: "menit yang lalu",
+        hour_ago: "jam yang lalu",
+        day_ago: "hari yang lalu",
+        month_ago: "bulan yang lalu",
+        year_ago: "tahun yang lalu"
+    },
+    en: {
+        tab_surah: "Surah",
+        tab_juz: "Juz",
+        tab_library: "Library",
+        search_placeholder: "Search Surah, Arabic Name, or Translation...",
+        loading_assets: "LOADING FONT ASSETS...",
+        loading_db_engine: "LOADING DATABASE ENGINE...",
+        downloading_db: "DOWNLOADING QURAN DATA...",
+        loading_local_db: "LOADING LOCAL DATABASE...",
+        db_failed: "FAILED TO LOAD DATABASE",
+        sync_google: "Sync Google",
+        create_folder: "+ New Folder",
+        last_read: "Last Read",
+        folder: "Folder",
+        all_bookmarks: "All Bookmarks",
+        empty_folder: "This folder is empty.",
+        empty_library: "Your library is empty.",
+        saved_ayah: "Saved ayahs",
+        page: "Page",
+        ayah: "Ayah",
+        juz: "Juz",
+        no_translation: "Translation is not available for this ayah.",
+        bookmark_added: "Bookmark added successfully",
+        bookmark_removed: "Bookmark removed successfully",
+        folder_created: "Folder created successfully",
+        folder_deleted: "Folder and its contents deleted successfully",
+        bookmark_moved: "Bookmark moved",
+        last_read_marked: "Marked as Last Read",
+        copied: "Ayah copied successfully",
+        copy_failed: "Failed to copy",
+        delete_bookmark_title: "Delete Bookmark",
+        delete_bookmark_msg: "Are you sure you want to delete this bookmark?",
+        delete_folder_title: "Delete Folder",
+        delete_folder_msg: "Are you sure you want to delete this folder and all its bookmarks?",
+        cancel: "Cancel",
+        delete: "Delete",
+        save: "Save",
+        goto: "Go To",
+        close: "Close",
+        move_bookmark_title: "Move Bookmark",
+        create_folder_title: "Create New Folder",
+        folder_name_placeholder: "Folder Name...",
+        root_folder: "-- No Folder (Root) --",
+        goto_title: "Go To Page",
+        edit_words_title: "Show/Hide Words",
+        edit_words_desc: "Tap a word to hide or show it.",
+        surah_info_title: "Surah Information",
+        not_available: "Detailed information for this surah is not available yet.",
+        data_not_found: "Data not found.",
+        settings_title: "Reading Settings",
+        mode_perkata: "Word by Word Mode",
+        transliteration: "Transliteration",
+        show_translation: "Show Translation",
+        app_language: "Language / Bahasa",
+        arabic_font_size: "Arabic Font Size",
+        sync_not_ready: "Sync system is not ready. Please try again shortly.",
+        syncing: "Syncing Data...",
+        auth_google: "Requesting Google access...",
+        sync_success: "Sync Successful!",
+        sync_failed: "Sync failed: ",
+        connected: "Connected: ",
+        last_sync: "Last Sync: ",
+        waiting_info: "Waiting for Info...",
+        never_sync: "Never",
+        just_now: "Just now",
+        min_ago: "mins ago",
+        hour_ago: "hours ago",
+        day_ago: "days ago",
+        month_ago: "months ago",
+        year_ago: "years ago"
+    }
+};
+
+function t(key) {
+    return i18n[appSettings.appLanguage][key] || key;
+}
+
+function applyUILanguage() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        el.innerText = t(el.getAttribute('data-i18n'));
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+    });
+}
+
+function getTimeAgo(timestamp) {
+    if (!timestamp) return '';
+    const seconds = Math.floor((new Date() - timestamp) / 1000);
+    if (seconds < 60) return t('just_now');
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} ${t('min_ago')}`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} ${t('hour_ago')}`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days} ${t('day_ago')}`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months} ${t('month_ago')}`;
+    const years = Math.floor(days / 365);
+    return `${years} ${t('year_ago')}`;
+}
+
+// Fungsi Formatter Footnote: Mengubah [[...]] menjadi element span.footnote
+function formatTranslation(text) {
+    if (!text) return "";
+    return text.replace(/\[\[([\s\S]*?)\]\]/g, '<span class="footnote">[$1]</span>');
+}
+// =========================================
 
 let db = null;
 let currentPage = 1;
@@ -108,13 +293,13 @@ function addBookmark() {
         renderBookmarkTab();
     }
 
-    showToast("Bookmark berhasil ditambahkan");
+    showToast(t('bookmark_added'));
     closeVersePopup();
     document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
 }
 
 function promptRemoveBookmark(id) {
-    showConfirm("Hapus Bookmark", "Apakah Anda yakin ingin menghapus bookmark ini?", () => {
+    showConfirm(t('delete_bookmark_title'), t('delete_bookmark_msg'), () => {
         removeBookmark(id);
     });
 }
@@ -134,7 +319,7 @@ function removeBookmark(id) {
     } else {
         renderBookmarkTab();
     }
-    showToast("Bookmark berhasil dihapus");
+    showToast(t('bookmark_removed'));
 }
 
 function setLastRead() {
@@ -150,7 +335,7 @@ function setLastRead() {
 
     saveBookmarks();
     renderBookmarkTab();
-    showToast("Ditandai sebagai Terakhir Dibaca");
+    showToast(t('last_read_marked'));
     closeVersePopup();
     document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
 
@@ -168,7 +353,7 @@ async function initApp() {
     const isDbDownloaded = localStorage.getItem('is_db_downloaded');
 
     try {
-        if (loaderText) loaderText.innerText = "MEMUAT ASET FONT...";
+        if (loaderText) loaderText.innerText = t('loading_assets');
         try {
             await Promise.all([
                 document.fonts.load("12px dkip"),
@@ -180,12 +365,12 @@ async function initApp() {
             console.warn("Beberapa font mungkin memakan waktu lebih lama untuk dimuat.", fontErr);
         }
 
-        if (loaderText) loaderText.innerText = "MEMUAT MESIN DATABASE...";
+        if (loaderText) loaderText.innerText = t('loading_db_engine');
         const SQL = await initSqlJs({ locateFile: file => `${file}` });
 
         if (loaderText) {
-            if (!isDbDownloaded) loaderText.innerText = "MENGUNDUH DATA AL-QUR'AN...";
-            else loaderText.innerText = "MEMUAT DATABASE LOKAL...";
+            if (!isDbDownloaded) loaderText.innerText = t('downloading_db');
+            else loaderText.innerText = t('loading_local_db');
         }
 
         const response = await fetch('quran.sqlite.gz');
@@ -215,7 +400,7 @@ async function initApp() {
 
     } catch (error) {
         console.error("Error App:", error);
-        if (loaderText) loaderText.innerText = "GAGAL MEMUAT DATABASE";
+        if (loaderText) loaderText.innerText = t('db_failed');
         alert("Pastikan file 'quran.sqlite.gz' berada di folder yang sama dan browser mendukung DecompressionStream.");
     } finally {
         setTimeout(() => {
@@ -308,6 +493,8 @@ function renderSurahList() {
     surahData.forEach(surah => {
         const pageQuery = execQuery(`SELECT page_number FROM verses WHERE surah_number = ${surah.id} LIMIT 1`);
         const startPage = pageQuery.length > 0 ? pageQuery[0].page_number : 1;
+        const surahSubtitle = appSettings.appLanguage === 'en' ? surah.name_latin : surah.name_id;
+
         html += `
             <div class="list-item surah-item" onclick="openQuranPage(${startPage})" 
                  data-id="${surah.id}" 
@@ -317,7 +504,7 @@ function renderSurahList() {
                 <div class="item-number">${surah.id}</div>
                 <div class="item-info">
                     <div class="item-title">${surah.name_latin}</div>
-                    <div class="item-subtitle">${surah.name_id}</div>
+                    <div class="item-subtitle">${surahSubtitle}</div>
                 </div>
                 <div class="item-arabic">surah${String(surah.id).padStart(3, '0')}</div>
             </div>
@@ -361,7 +548,7 @@ function moveFolder(id, dir) {
 }
 
 function promptDeleteFolder(id) {
-    showConfirm("Hapus Folder", "Apakah Anda yakin ingin menghapus folder ini beserta seluruh bookmark di dalamnya?", () => {
+    showConfirm(t('delete_folder_title'), t('delete_folder_msg'), () => {
         deleteFolder(id);
     });
 }
@@ -384,7 +571,7 @@ function deleteFolder(id) {
 
     saveBookmarks();
     renderBookmarkTab();
-    showToast("Folder beserta isinya berhasil dihapus");
+    showToast(t('folder_deleted'));
 }
 
 function moveBookmark(id, dir) {
@@ -444,7 +631,7 @@ function renderBookmarkTab() {
                 </div>
                 <div class="item-info">
                     <div class="item-title">${appLastRead.surahName}</div>
-                    <div class="item-subtitle">Ayat ${appLastRead.verseId} • Hal ${appLastRead.pageNumber}</div>
+                    <div class="item-subtitle">${t('ayah')} ${appLastRead.verseId} • ${t('page')} ${appLastRead.pageNumber} <br> <span style="font-size:0.6rem; color:var(--primary); font-weight:600;">${getTimeAgo(appLastRead.timestamp)}</span></div>
                 </div>
             </div>
         `;
@@ -472,7 +659,7 @@ function renderBookmarkTab() {
                 </div>
                 <div class="item-info">
                     <div class="item-title">${folder.name}</div>
-                    <div class="item-subtitle">${count} Ayat tersimpan</div>
+                    <div class="item-subtitle">${count} ${t('saved_ayah')}</div>
                 </div>
                 <div class="action-group">
                     <button class="action-btn" onclick="event.stopPropagation(); moveFolder('${folder.id}', -1)">${svgUp}</button>
@@ -494,7 +681,7 @@ function renderBookmarkTab() {
     } else {
         if (titleSemua) titleSemua.style.display = 'none';
         if (visibleFolders.length === 0 && !appLastRead) {
-            bookmarkList.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted); font-size: 0.8rem;">Library Anda masih kosong.</div>';
+            bookmarkList.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-muted); font-size: 0.8rem;">${t('empty_library')}</div>`;
             return;
         } else {
             bookmarkList.innerHTML = '';
@@ -505,10 +692,10 @@ function renderBookmarkTab() {
     rootBookmarks.forEach(bm => {
         bHtml += `
             <div class="list-item" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
-                <div class="item-number" style="font-size: 0.7rem;">Hal<br>${bm.pageNumber}</div>
+                <div class="item-number" style="font-size: 0.7rem;">${t('page')}<br>${bm.pageNumber}</div>
                 <div class="item-info">
                     <div class="item-title">${bm.surahName}</div>
-                    <div class="item-subtitle">Ayat ${bm.verseId}</div>
+                    <div class="item-subtitle">${t('ayah')} ${bm.verseId}</div>
                 </div>
                 <div class="action-group">
                     <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', -1)">${svgUp}</button>
@@ -540,7 +727,7 @@ function executeCreateFolder() {
         saveBookmarks();
         renderBookmarkTab();
         closeFolderModal();
-        showToast("Folder berhasil dibuat");
+        showToast(t('folder_created'));
     }
 }
 
@@ -548,7 +735,7 @@ function openMoveModal(bookmarkId) {
     bookmarkToMove = appBookmarks.find(b => b.id === bookmarkId);
     if(!bookmarkToMove) return;
     const list = document.getElementById('move-folder-list');
-    let html = `<div class="move-folder-item" onclick="executeMoveBookmark(null)">-- Tanpa Folder (Root) --</div>`;
+    let html = `<div class="move-folder-item" onclick="executeMoveBookmark(null)">${t('root_folder')}</div>`;
 
     appFolders.filter(f => !f.deleted).forEach(f => {
         html += `<div class="move-folder-item" onclick="executeMoveBookmark('${f.id}')">📁 ${f.name}</div>`;
@@ -574,7 +761,7 @@ function executeMoveBookmark(folderId) {
         } else {
             renderBookmarkTab();
         }
-        showToast("Bookmark dipindahkan");
+        showToast(t('bookmark_moved'));
     }
     closeMoveModal();
 }
@@ -590,7 +777,7 @@ function openFolderView(folderId, folderName) {
     const folderBookmarks = appBookmarks.filter(b => b.folderId === folderId && !b.deleted);
 
     if(folderBookmarks.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted); font-size: 0.8rem;">Folder ini kosong.</div>';
+        container.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-muted); font-size: 0.8rem;">${t('empty_folder')}</div>`;
         return;
     }
 
@@ -729,11 +916,11 @@ function renderJuzList() {
         let paddedJuz = String(i).padStart(3, '0');
         html += `
             <div class="list-item" onclick="openQuranPage(${startPage})">
-                <div class="item-number">Juz<br>${i}</div>
+                <div class="item-number">${t('juz')}<br>${i}</div>
                 
                 <div class="item-info">
                     <div class="juz-title item-title">juz${paddedJuz}</div>
-                    <div class="item-subtitle">${surahName} • Ayat ${verseNumber}</div>
+                    <div class="item-subtitle">${surahName} • ${t('ayah')} ${verseNumber}</div>
                 </div>
                 
                 <div class="first_ayah">j${paddedJuz}</div>
@@ -766,17 +953,16 @@ function applyTranslationState() {
 
     if (keepTranslationExpanded && activeVerseData) {
         let text = activeVerseData.translationText.replace(/&quot;/g, '"').replace(/\\'/g, "'");
-        transContainer.innerText = text || "Terjemahan tidak tersedia untuk ayat ini.";
+        // Gunakan innerHTML agar tag span.footnote dari regex bisa dirender
+        transContainer.innerHTML = formatTranslation(text) || t('no_translation');
         popup.classList.add('expanded');
         if(translateBtn) translateBtn.classList.add('active-btn');
     } else {
         popup.classList.remove('expanded');
         if(translateBtn) translateBtn.classList.remove('active-btn');
-        // Kosongkan teks agar lebar popup bisa kembali ke ukuran asalnya (compact)
-        // Gunakan timeout agar isi dibersihkan setelah animasi max-height (CSS) mengecil sempurna
         setTimeout(() => {
             if(!popup.classList.contains('expanded')) {
-                transContainer.innerText = "";
+                transContainer.innerHTML = "";
             }
         }, 400);
     }
@@ -794,7 +980,7 @@ function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, t
             const titleEl = document.getElementById('vp-title');
             const subtitleEl = document.getElementById('vp-subtitle');
             if(titleEl) titleEl.innerText = surahName;
-            if(subtitleEl) subtitleEl.innerText = `Ayat ${verseId}`;
+            if(subtitleEl) subtitleEl.innerText = `${t('ayah')} ${verseId}`;
 
             applyTranslationState();
             popup.classList.add('active');
@@ -817,7 +1003,7 @@ function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, t
         const titleEl = document.getElementById('vp-title');
         const subtitleEl = document.getElementById('vp-subtitle');
         if(titleEl) titleEl.innerText = surahName;
-        if(subtitleEl) subtitleEl.innerText = `Ayat ${verseId}`;
+        if(subtitleEl) subtitleEl.innerText = `${t('ayah')} ${verseId}`;
 
         applyTranslationState();
         popup.classList.add('active');
@@ -829,7 +1015,7 @@ function copyVerseText() {
     const textToCopy = `${activeVerseData.arabicText}\n\n"${activeVerseData.translationText}"\n(QS. ${activeVerseData.surahName} : ${activeVerseData.verseId})`;
 
     navigator.clipboard.writeText(textToCopy).then(() => {
-        showToast("Ayat berhasil disalin");
+        showToast(t('copied'));
         closeVersePopup();
         document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
     }).catch(err => {
@@ -858,13 +1044,12 @@ function closeVersePopup() {
         const translateBtn = document.getElementById('vp-btn-translate');
         if(translateBtn) translateBtn.classList.remove('active-btn');
 
-        // Reset memori state ke default agar tertutup ketika buka ayat lain di kemudian waktu
         keepTranslationExpanded = false;
 
         setTimeout(() => {
             const transContainer = document.getElementById('vp-translation-text');
             if(transContainer && !popup.classList.contains('expanded')) {
-                transContainer.innerText = "";
+                transContainer.innerHTML = "";
             }
         }, 400);
     }
@@ -874,14 +1059,15 @@ function closeVersePopup() {
 function openSurahInfoModal(surahId) {
     if (preventNextClick) return;
 
-    const data = execQuery(`SELECT name_latin, name_id, long_desc FROM surah WHERE id=${surahId}`);
+    const data = execQuery(`SELECT name_latin, name_id FROM surah WHERE id=${surahId}`);
     if(data.length > 0) {
         const s = data[0];
-        document.getElementById('surah-info-title').innerText = `${s.name_latin} (${s.name_id})`;
+        const subName = appSettings.appLanguage === 'en' ? s.name_latin : s.name_id;
+        document.getElementById('surah-info-title').innerText = `${s.name_latin} (${subName})`;
 
-        let desc = s.long_desc ? s.long_desc.replace(/\n/g, '<br><br>') : 'Informasi detail untuk surah ini belum tersedia.';
+        let descInfo = s.long_desc ? s.long_desc.replace(/\n/g, '<br><br>') : t('not_available');
 
-        document.getElementById('surah-info-content').innerHTML = desc;
+        document.getElementById('surah-info-content').innerHTML = descInfo;
         document.getElementById('surah-info-modal').classList.add('active');
     }
 }
@@ -905,11 +1091,11 @@ function renderPageContent(pageNumber, forceRender = false) {
     `);
 
     if (verses.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:50px; color: var(--text-muted); font-size: 0.8rem;">Data tidak ditemukan.</div>';
+        container.innerHTML = `<div style="text-align:center; padding:50px; color: var(--text-muted); font-size: 0.8rem;">${t('data_not_found')}</div>`;
         return;
     }
 
-    const isMushafMode = !appSettings.wordByWord && !appSettings.showTransliteration && appSettings.translationLang === 'none';
+    const isMushafMode = !appSettings.wordByWord && !appSettings.showTransliteration && !appSettings.showTranslation;
     if (isMushafMode) {
         container.classList.remove('list-mode');
         container.classList.add('mushaf-mode');
@@ -921,13 +1107,14 @@ function renderPageContent(pageNumber, forceRender = false) {
     let html = '';
     verses.forEach(v => {
         if (v.verse_number === 1) {
+            const surahSubName = appSettings.appLanguage === 'en' ? v.name_latin : v.name_id;
             html += `
                 <div class="surah-header-separator" onclick="openSurahInfoModal(${v.surah_number})">
-                    <div class="surah-col-left">${v.verses_count}<br>Ayat</div>
+                    <div class="surah-col-left">${v.verses_count}<br>${t('ayah')}</div>
                     <div class="surah-col-center">                       
                         <div class="surah-name-ar">surah${String(v.surah_number).padStart(3, '0')}</div>
                         <div class="surah-name-latin">${v.name_latin}</div>
-                        <div class="surah-name-translation">${v.name_id}</div>
+                        <div class="surah-name-translation">${surahSubName}</div>
                     </div>
                     <div class="surah-col-right">${v.location}</div>
                 </div>
@@ -955,7 +1142,10 @@ function renderPageContent(pageNumber, forceRender = false) {
 
         const safeSurahName = v.name_latin.replace(/'/g, "\\'");
         const cleanArabicForCopy = textForCopy.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-        const cleanTranslationForCopy = (v.translation_id || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+        const selectedTranslationText = appSettings.appLanguage === 'en' ? v.translation_en : v.translation_id;
+        const cleanTranslationForCopy = (selectedTranslationText || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
         const verseElId = `verse-wrap-${v.surah_number}-${v.verse_number}`;
 
         if (isMushafMode) {
@@ -969,15 +1159,16 @@ function renderPageContent(pageNumber, forceRender = false) {
                 try {
                     arWords = JSON.parse(v.arabic_words || "[]");
                     trWords = JSON.parse(v.transliteration_words || "[]");
-                    if (appSettings.translationLang === 'id') tlWords = JSON.parse(v.translation_id_words || "[]");
-                    else if (appSettings.translationLang === 'en') tlWords = JSON.parse(v.translation_en_words || "[]");
+                    if (appSettings.showTranslation) {
+                        tlWords = appSettings.appLanguage === 'en' ? JSON.parse(v.translation_en_words || "[]") : JSON.parse(v.translation_id_words || "[]");
+                    }
                 } catch (e) {}
 
                 if (arWords.length > 0) {
                     for (let i = 0; i < arWords.length; i++) {
                         html += `<div class="word-group"><div class="word-arabic">${arWords[i] || ''}</div>`;
                         if (appSettings.showTransliteration && trWords[i]) html += `<div class="word-transliteration">${trWords[i]}</div>`;
-                        if (appSettings.translationLang !== 'none' && tlWords[i]) html += `<div class="word-translation">${tlWords[i]}</div>`;
+                        if (appSettings.showTranslation && tlWords[i]) html += `<div class="word-translation">${formatTranslation(tlWords[i])}</div>`;
                         html += `</div>`;
                     }
                 } else {
@@ -987,8 +1178,7 @@ function renderPageContent(pageNumber, forceRender = false) {
             } else {
                 html += `<div class="verse-text-group"><span class="verse-word">${fullArabicText}</span></div>`;
                 if (appSettings.showTransliteration) html += `<div class="verse-transliteration">${v.transliteration || ''}</div>`;
-                if (appSettings.translationLang === 'id') html += `<div class="verse-translation">${v.translation_id || ''}</div>`;
-                else if (appSettings.translationLang === 'en') html += `<div class="verse-translation">${v.translation_en || ''}</div>`;
+                if (appSettings.showTranslation) html += `<div class="verse-translation">${formatTranslation(selectedTranslationText || '')}</div>`;
             }
 
             html += `</div>`;
@@ -1036,7 +1226,7 @@ function openQuranPage(pageNumber, highlightSurah = null, highlightVerse = null,
 }
 
 function updateQuranUI() {
-    let headerText = `Halaman ${currentPage}`;
+    let headerText = `${t('page')} ${currentPage}`;
     let headerParts = [];
     const pageVerses = execQuery(`SELECT surah_number, verse_number, juz_number FROM verses WHERE page_number = ${currentPage}`);
 
@@ -1065,7 +1255,7 @@ function updateQuranUI() {
         headerText = `
             <span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem;">${surahString}</span>
             <span style="display: block; font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-top: 2px;">
-                ${juzString ? 'Juz ' + juzString : ''}
+                ${juzString ? t('juz') + ' ' + juzString : ''}
             </span>
         `;
     }
@@ -1074,7 +1264,7 @@ function updateQuranUI() {
     if (headerTitleEl) headerTitleEl.innerHTML = headerText;
 
     const pageInfoPill = document.getElementById('page-info-pill');
-    if (pageInfoPill) pageInfoPill.innerText = `Hal ${currentPage}`;
+    if (pageInfoPill) pageInfoPill.innerText = `${t('page')} ${currentPage}`;
 
     const btnPrev = document.getElementById('btn-prev-page');
     if (btnPrev) btnPrev.disabled = (currentPage <= 1);
@@ -1211,7 +1401,6 @@ function openSettings() {
     closeVersePopup();
     document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
 
-    // Perbarui UI pengaturan berdasarkan variabel aktif di memori
     applySettingsToUI();
 
     document.getElementById('info-sheet').classList.add('expanded');
@@ -1229,31 +1418,32 @@ function checkOverlay() {
 }
 
 function applySettingsToUI() {
-    const fontSelect = document.getElementById('font-select');
+    const selectLanguage = document.getElementById('select-language');
     const togglePerkata = document.getElementById('toggle-perkata');
     const toggleTransliterasi = document.getElementById('toggle-transliterasi');
-    const selectTranslation = document.getElementById('select-translation');
+    const toggleTranslation = document.getElementById('toggle-translation');
 
-    if (fontSelect) fontSelect.value = appSettings.font;
+    if (selectLanguage) selectLanguage.value = appSettings.appLanguage;
     if (togglePerkata) togglePerkata.checked = appSettings.wordByWord;
     if (toggleTransliterasi) toggleTransliterasi.checked = appSettings.showTransliteration;
-    if (selectTranslation) selectTranslation.value = appSettings.translationLang;
+    if (toggleTranslation) toggleTranslation.checked = appSettings.showTranslation;
 }
 
 function updateSettings() {
-    const fontSelect = document.getElementById('font-select');
+    const selectLanguage = document.getElementById('select-language');
     const togglePerkata = document.getElementById('toggle-perkata');
     const toggleTransliterasi = document.getElementById('toggle-transliterasi');
-    const selectTranslation = document.getElementById('select-translation');
+    const toggleTranslation = document.getElementById('toggle-translation');
 
-    if (fontSelect) appSettings.font = fontSelect.value;
+    if (selectLanguage) appSettings.appLanguage = selectLanguage.value;
     if (togglePerkata) appSettings.wordByWord = togglePerkata.checked;
     if (toggleTransliterasi) appSettings.showTransliteration = toggleTransliterasi.checked;
-    if (selectTranslation) appSettings.translationLang = selectTranslation.value;
+    if (toggleTranslation) appSettings.showTranslation = toggleTranslation.checked;
 
-    appSettings.timestamp = new Date().getTime(); // Mark the update time for Sync
+    appSettings.timestamp = new Date().getTime();
     localStorage.setItem('quran_settings', JSON.stringify(appSettings));
 
+    applyUILanguage();
     applySettings();
 
     document.querySelectorAll('.quran-page-content').forEach(container => { container.dataset.loaded = "false"; });
@@ -1263,6 +1453,13 @@ function updateSettings() {
         renderPageContent(currentPage, true);
         renderPageContent(currentPage - 1, true);
         renderPageContent(currentPage + 1, true);
+
+        // Memperbarui UI Al-Qur'an agar label "Hal/Page" ikut berganti seketika
+        updateQuranUI();
+    } else {
+        renderSurahList();
+        renderJuzList();
+        renderBookmarkTab();
     }
 
     if (localStorage.getItem('quran_gdrive_linked') === 'true' && driveAccessToken) {
@@ -1274,12 +1471,13 @@ function loadSettings() {
     const saved = localStorage.getItem('quran_settings');
     if (saved) appSettings = Object.assign(appSettings, JSON.parse(saved));
     applySettingsToUI();
+    applyUILanguage();
     applySettings();
 }
 
 function changeFontSize(step) {
     appSettings.arabicSize += step;
-    if (appSettings.arabicSize < 1.5) appSettings.arabicSize = 1.5;
+    if (appSettings.arabicSize < 0.75) appSettings.arabicSize = 0.75;
     if (appSettings.arabicSize > 5.0) appSettings.arabicSize = 5.0;
     updateSettings();
 }
@@ -1384,7 +1582,7 @@ function updateGoToAyahAndPage(surahId, ayahId = 1) {
     let ayahHtml = '';
     for(let i=1; i<=gotoData.totalAyahs; i++) {
         const activeClass = i === gotoData.ayah ? 'active' : '';
-        ayahHtml += `<div class="goto-item ${activeClass}" onclick="selectGoToAyah(${i})">Ayat ${i}</div>`;
+        ayahHtml += `<div class="goto-item ${activeClass}" onclick="selectGoToAyah(${i})">${t('ayah')} ${i}</div>`;
     }
     listAyah.innerHTML = ayahHtml;
     scrollToActiveItem(listAyah);
@@ -1404,7 +1602,7 @@ function updateGoToPageBySurahAyah() {
     let pageHtml = '';
     for(let i=1; i<=604; i++) {
         const activeClass = i === gotoData.page ? 'active' : '';
-        pageHtml += `<div class="goto-item ${activeClass}" onclick="selectGoToPage(${i})">Hal ${i}</div>`;
+        pageHtml += `<div class="goto-item ${activeClass}" onclick="selectGoToPage(${i})">${t('page')} ${i}</div>`;
     }
     listPage.innerHTML = pageHtml;
     scrollToActiveItem(listPage);
@@ -1486,21 +1684,22 @@ function initGoogleSync() {
 function updateSyncButtonUI() {
     const btn = document.getElementById('btn-sync-drive');
     const infoContainer = document.getElementById('sync-info-container');
-    const accountEl = document.getElementById('sync-account-name');
+    const accountEl = document.getElementById('sync-account-email');
     const timeEl = document.getElementById('sync-last-time');
 
     if (!btn) return;
 
     const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
     if (isLinked) {
-        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 3px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg> Sinkronisasi`;
+        const textBtn = document.getElementById('text-sync-btn');
+        if(textBtn) textBtn.innerText = t('sync_google');
         btn.style.backgroundColor = '#10b981';
 
         if (infoContainer) {
             infoContainer.style.display = 'block';
 
-            const savedEmail = localStorage.getItem('quran_sync_email') || 'Menunggu Info...';
-            const lastSync = localStorage.getItem('quran_last_sync') || 'Belum pernah';
+            const savedEmail = localStorage.getItem('quran_sync_email') || t('waiting_info');
+            const lastSync = localStorage.getItem('quran_last_sync') || t('never_sync');
 
             if (accountEl) accountEl.innerText = `${savedEmail}`;
             if (timeEl) timeEl.innerText = `${lastSync}`;
@@ -1510,12 +1709,12 @@ function updateSyncButtonUI() {
 
 function handleAuthClick() {
     if (!tokenClient) {
-        showToast("Sistem Sinkronisasi belum siap. Coba sebentar lagi.");
+        showToast(t('sync_not_ready'));
         return;
     }
 
     const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
-    showToast(isLinked ? "Menyinkronkan Data..." : "Meminta akses ke Google...");
+    showToast(isLinked ? t('syncing') : t('auth_google'));
 
     if (isLinked) {
         tokenClient.requestAccessToken({prompt: ''});
@@ -1574,11 +1773,18 @@ async function performSync(isSilent = false) {
                 appSettings = Object.assign(appSettings, remoteData.settings);
                 localStorage.setItem('quran_settings', JSON.stringify(appSettings));
                 applySettingsToUI();
+                applyUILanguage();
+                applySettings();
             }
         }
 
         saveBookmarks();
-        renderBookmarkTab();
+
+        if (document.getElementById('home-view').classList.contains('active')) {
+            renderSurahList();
+            renderJuzList();
+            renderBookmarkTab();
+        }
 
         if (currentViewingFolderId) {
             const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
@@ -1598,10 +1804,10 @@ async function performSync(isSilent = false) {
         localStorage.setItem('quran_last_sync', timeString);
         updateSyncButtonUI();
 
-        if (!isSilent) showToast("Sinkronisasi Berhasil!");
+        if (!isSilent) showToast(t('sync_success'));
     } catch (error) {
         console.error("Sync error:", error);
-        if (!isSilent) showToast("Gagal melakukan sinkronisasi: " + error.message);
+        if (!isSilent) showToast(t('sync_failed') + error.message);
     }
 }
 

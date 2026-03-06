@@ -23,7 +23,7 @@
 
 <div id="global-loader" class="global-loader">
     <div class="spinner"></div>
-    <div class="loader-text" id="loader-text">MEMUAT...</div>
+    <div class="loader-text" id="loader-text" data-i18n="loading_assets">MEMUAT ASET FONT...</div>
 </div>
 
 <div class="app-container">
@@ -43,9 +43,9 @@
                 </button>
             </div>
             <div class="quran-tabs">
-                <button class="quran-tab active" onclick="switchMainTab(0)">Surah</button>
-                <button class="quran-tab" onclick="switchMainTab(1)">Juz</button>
-                <button class="quran-tab" onclick="switchMainTab(2)">Library</button>
+                <button class="quran-tab active" onclick="switchMainTab(0)" data-i18n="tab_surah">Surah</button>
+                <button class="quran-tab" onclick="switchMainTab(1)" data-i18n="tab_juz">Juz</button>
+                <button class="quran-tab" onclick="switchMainTab(2)" data-i18n="tab_library">Library</button>
                 <div class="tab-indicator" id="main-tab-indicator"></div>
             </div>
         </div>
@@ -53,7 +53,7 @@
         <div class="tab-content-container" id="main-tab-swipe-area">
             <div id="pane-0" class="tab-pane active">
                 <div class="search-container">
-                    <input type="text" id="search-surah" placeholder="Cari Nomor, Nama Arab, atau Terjemahan..." onkeyup="filterSurah()">
+                    <input type="text" id="search-surah" data-i18n-placeholder="search_placeholder" placeholder="Cari Surah, Nama Arab, atau Terjemahan..." onkeyup="filterSurah()">
                 </div>
                 <div class="list-container" id="surah-list" style="padding-top: 5px;"></div>
             </div>
@@ -63,29 +63,29 @@
                 <div class="bookmark-header-actions" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px;">
                     <div id="sync-info-container" style="display: none; font-size: 0.7rem; color: var(--text-muted); padding: 0 4px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span id="sync-account-name" style="font-weight: 600; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%;">Terhubung: -</span>
-                            <span id="sync-last-time" style="font-size: 0.65rem; text-align: right;">Terakhir Sync: -</span>
+                            <span id="sync-account-name" style="font-weight: 600; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%;"><span data-i18n="connected">Terhubung: </span><span id="sync-account-email">-</span></span>
+                            <span style="font-size: 0.65rem; text-align: right;"><span data-i18n="last_sync">Terakhir Sync: </span><span id="sync-last-time">-</span></span>
                         </div>
                     </div>
 
                     <div style="display: flex; gap: 8px; width: 100%;">
-                        <button class="btn-create-folder" onclick="openCreateFolderModal()" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 8px 5px;">
+                        <button class="btn-create-folder" onclick="openCreateFolderModal()" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 8px 5px;" data-i18n="create_folder">
                             + Buat Folder
                         </button>
                         <button class="btn-create-folder" id="btn-sync-drive" onclick="handleAuthClick()" style="flex: 1; background-color: #4285F4; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 8px 5px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 3px; vertical-align: middle;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.35 1.64"></path></svg>
-                            Sync Google
+                            <span id="text-sync-btn" data-i18n="sync_google">Sync Google</span>
                         </button>
                     </div>
                 </div>
                 <div id="bookmark-root-view">
-                    <div class="section-title" id="title-last-read" style="display: none; padding-top: 5px;">Terakhir Dibaca</div>
+                    <div class="section-title" id="title-last-read" style="display: none; padding-top: 5px;" data-i18n="last_read">Terakhir Dibaca</div>
                     <div id="last-read-container" class="list-container" style="padding-bottom: 0;"></div>
 
-                    <div class="section-title" id="title-folder" style="display: none; padding-top: 10px;">Folder</div>
+                    <div class="section-title" id="title-folder" style="display: none; padding-top: 10px;" data-i18n="folder">Folder</div>
                     <div class="list-container" id="folder-list" style="padding-bottom: 0;"></div>
 
-                    <div class="section-title" id="title-semua-bookmark" style="display: none; padding-top: 10px;">Semua Bookmark</div>
+                    <div class="section-title" id="title-semua-bookmark" style="display: none; padding-top: 10px;" data-i18n="all_bookmarks">Semua Bookmark</div>
                     <div class="list-container" id="bookmark-list"></div>
                 </div>
                 <div id="bookmark-folder-view" style="display: none;">
@@ -158,31 +158,38 @@
     <div class="bottom-sheet" id="info-sheet">
         <div class="drag-area" id="info-drag-area"><div class="drag-handle"></div></div>
         <div class="sheet-content" id="content-settings">
-            <h3 class="sheet-title">Pengaturan Membaca</h3>
+            <h3 class="sheet-title" data-i18n="settings_title">Pengaturan Membaca</h3>
+
             <div class="setting-item">
-                <label for="toggle-perkata">Mode Perkata</label>
+                <label for="select-language" data-i18n="app_language">Bahasa / Language</label>
+                <select id="select-language" onchange="updateSettings()" class="custom-select">
+                    <option value="id">Indonesia</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label for="toggle-perkata" data-i18n="mode_perkata">Mode Perkata</label>
                 <label class="switch">
                     <input type="checkbox" id="toggle-perkata" onchange="updateSettings()">
                     <span class="slider round"></span>
                 </label>
             </div>
             <div class="setting-item">
-                <label for="toggle-transliterasi">Transliterasi (Latin)</label>
+                <label for="toggle-transliterasi" data-i18n="transliteration">Transliterasi (Latin)</label>
                 <label class="switch">
                     <input type="checkbox" id="toggle-transliterasi" onchange="updateSettings()">
                     <span class="slider round"></span>
                 </label>
             </div>
             <div class="setting-item">
-                <label for="select-translation">Terjemahan</label>
-                <select id="select-translation" onchange="updateSettings()" class="custom-select">
-                    <option value="none">Sembunyikan</option>
-                    <option value="id">Indonesia</option>
-                    <option value="en">English</option>
-                </select>
+                <label for="toggle-translation" data-i18n="show_translation">Tampilkan Terjemahan</label>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-translation" onchange="updateSettings()">
+                    <span class="slider round"></span>
+                </label>
             </div>
             <div class="setting-item">
-                <label>Ukuran Font Arab</label>
+                <label data-i18n="arabic_font_size">Ukuran Font Arab</label>
                 <div class="font-controls">
                     <button class="font-size-btn" onclick="changeFontSize(-0.2)">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -198,57 +205,57 @@
 
     <div class="modal-container" id="goto-modal">
         <div class="modal-box">
-            <h3 class="modal-title">Pindah Halaman</h3>
+            <h3 class="modal-title" data-i18n="goto_title">Pindah Halaman</h3>
             <div class="goto-grid">
                 <div class="goto-col">
-                    <div class="goto-col-title">Surah</div>
+                    <div class="goto-col-title" data-i18n="tab_surah">Surah</div>
                     <div class="goto-list" id="goto-list-surah"></div>
                 </div>
                 <div class="goto-col">
-                    <div class="goto-col-title">Ayat</div>
+                    <div class="goto-col-title" data-i18n="ayah">Ayat</div>
                     <div class="goto-list" id="goto-list-ayah"></div>
                 </div>
                 <div class="goto-col">
-                    <div class="goto-col-title">Halaman</div>
+                    <div class="goto-col-title" data-i18n="page">Halaman</div>
                     <div class="goto-list" id="goto-list-page"></div>
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="btn-cancel" onclick="closeGoToPopup()">Batal</button>
-                <button class="btn-primary" onclick="executeGoTo()">Go To</button>
+                <button class="btn-cancel" onclick="closeGoToPopup()" data-i18n="cancel">Batal</button>
+                <button class="btn-primary" onclick="executeGoTo()" data-i18n="goto">Go To</button>
             </div>
         </div>
     </div>
 
     <div class="modal-container" id="folder-create-modal">
         <div class="modal-box">
-            <h3 class="modal-title">Buat Folder Baru</h3>
-            <input type="text" id="input-folder-name" class="modal-input" placeholder="Nama Folder...">
+            <h3 class="modal-title" data-i18n="create_folder_title">Buat Folder Baru</h3>
+            <input type="text" id="input-folder-name" class="modal-input" data-i18n-placeholder="folder_name_placeholder" placeholder="Nama Folder...">
             <div class="modal-actions">
-                <button class="btn-cancel" onclick="closeFolderModal()">Batal</button>
-                <button class="btn-primary" onclick="executeCreateFolder()">Simpan</button>
+                <button class="btn-cancel" onclick="closeFolderModal()" data-i18n="cancel">Batal</button>
+                <button class="btn-primary" onclick="executeCreateFolder()" data-i18n="save">Simpan</button>
             </div>
         </div>
     </div>
 
     <div class="modal-container" id="folder-move-modal">
         <div class="modal-box">
-            <h3 class="modal-title">Pindahkan Bookmark</h3>
+            <h3 class="modal-title" data-i18n="move_bookmark_title">Pindahkan Bookmark</h3>
             <div class="move-folder-list" id="move-folder-list"></div>
             <div class="modal-actions">
-                <button class="btn-cancel" onclick="closeMoveModal()">Batal</button>
+                <button class="btn-cancel" onclick="closeMoveModal()" data-i18n="cancel">Batal</button>
             </div>
         </div>
     </div>
 
     <div class="modal-container" id="edit-words-modal">
         <div class="modal-box" style="max-width: 380px; width: 95%;">
-            <h3 class="modal-title">Tampilkan/Sembunyikan Kata</h3>
-            <p style="text-align: center; font-size: 0.7rem; color: var(--text-muted); margin-top: -10px; margin-bottom: 12px;">Ketuk kata untuk menyembunyikan atau menampilkannya.</p>
+            <h3 class="modal-title" data-i18n="edit_words_title">Tampilkan/Sembunyikan Kata</h3>
+            <p style="text-align: center; font-size: 0.7rem; color: var(--text-muted); margin-top: -10px; margin-bottom: 12px;" data-i18n="edit_words_desc">Ketuk kata untuk menyembunyikan atau menampilkannya.</p>
             <div class="edit-words-container" id="edit-words-container"></div>
             <div class="modal-actions" style="margin-top: 15px;">
-                <button class="btn-cancel" onclick="closeEditWordsModal()">Batal</button>
-                <button class="btn-primary" onclick="saveEditWords()">Simpan</button>
+                <button class="btn-cancel" onclick="closeEditWordsModal()" data-i18n="cancel">Batal</button>
+                <button class="btn-primary" onclick="saveEditWords()" data-i18n="save">Simpan</button>
             </div>
         </div>
     </div>
@@ -258,8 +265,8 @@
             <h3 class="modal-title" id="confirm-title">Konfirmasi</h3>
             <p id="confirm-message" style="text-align:center; color:var(--text-muted); margin-bottom:15px; font-size:0.8rem; line-height:1.5;"></p>
             <div class="modal-actions">
-                <button class="btn-cancel" onclick="closeConfirmModal()">Batal</button>
-                <button class="btn-primary" style="background:#ef4444;" onclick="executeConfirmModal()">Hapus</button>
+                <button class="btn-cancel" onclick="closeConfirmModal()" data-i18n="cancel">Batal</button>
+                <button class="btn-primary" style="background:#ef4444;" onclick="executeConfirmModal()" data-i18n="delete">Hapus</button>
             </div>
         </div>
     </div>
@@ -270,7 +277,7 @@
             <div id="surah-info-content" style="flex: 1; overflow-y: auto; text-align: justify; font-size: 0.8rem; line-height: 1.5; color: var(--text-main); margin-bottom: 15px; padding-right: 5px;">
             </div>
             <div class="modal-actions">
-                <button class="btn-primary" style="width: 100%;" onclick="closeSurahInfoModal()">Tutup</button>
+                <button class="btn-primary" style="width: 100%;" onclick="closeSurahInfoModal()" data-i18n="close">Tutup</button>
             </div>
         </div>
     </div>

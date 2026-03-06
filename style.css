@@ -383,7 +383,6 @@ body {
 .page-info-pill.interactive { cursor: pointer; transition: background-color 0.2s; }
 .page-info-pill.interactive:active { background-color: var(--border-color); }
 
-/* --- PERBAIKAN ANIMASI COLLAPSE & PENGEMBALIAN LEBAR --- */
 .verse-popup {
     position: fixed; bottom: 75px; left: 50%; transform: translateX(-50%) translateY(20px);
     background: var(--nav-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
@@ -391,8 +390,6 @@ body {
     padding: 10px 15px; border-radius: 20px; z-index: 200;
     display: flex; flex-direction: column; align-items: stretch;
     opacity: 0; visibility: hidden;
-
-    /* Mengunci lebar default (compact) secara fix agar bisa dianimasikan */
     width: 310px;
     max-width: 92%;
     transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
@@ -437,7 +434,6 @@ body {
     line-height: 1.5;
     text-align: left;
 }
-/* -------------------------------------------------------- */
 
 .bookmark-header-actions { padding: 10px 10px 5px 10px; }
 .btn-create-folder {
@@ -599,4 +595,19 @@ input:checked + .slider:before { transform: translateX(18px); }
 .edit-word-chip.hidden {
     opacity: 0.4; background: var(--bg-body); text-decoration: line-through;
     box-shadow: none; border-color: transparent;
+}
+
+/* STYLING UNTUK FOOTNOTE DI DALAM TERJEMAHAN */
+.footnote {
+    font-size: 0.85em;
+    color: var(--primary);
+    background-color: var(--primary-light);
+    padding: 2px 6px;
+    border-radius: 6px;
+    margin: 0 2px;
+    font-style: italic;
+    line-height: 1.5;
+    display: inline;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
 }
