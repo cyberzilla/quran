@@ -239,6 +239,7 @@ let bookmarkToMove = null;
 let confirmCallback = null;
 
 let keepTranslationExpanded = false;
+let toastTimeout = null;
 
 let gotoData = { surah: 1, ayah: 1, page: 1, totalAyahs: 7 };
 
@@ -252,12 +253,17 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// PERBAIKAN: Membungkus pesan dalam elemen span .toast-inner agar styling line-clamp stabil
 function showToast(message) {
     const toast = document.getElementById('toast');
     if(!toast) return;
-    toast.innerText = message;
+
+    toast.innerHTML = `<span class="toast-inner">${message}</span>`;
     toast.classList.add('show');
-    setTimeout(() => {
+
+    if(toastTimeout) clearTimeout(toastTimeout);
+
+    toastTimeout = setTimeout(() => {
         toast.classList.remove('show');
     }, 2500);
 }
@@ -309,6 +315,15 @@ function saveBookmarks() {
     localStorage.setItem('quran_last_read', JSON.stringify(appLastRead));
 }
 
+function sortItemsArray(arr) {
+    return arr.sort((a, b) => {
+        const orderA = a.orderIndex !== undefined ? a.orderIndex : 999999;
+        const orderB = b.orderIndex !== undefined ? b.orderIndex : 999999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (b.timestamp || 0) - (a.timestamp || 0);
+    });
+}
+
 function addBookmark() {
     if(!activeVerseData) return;
 
@@ -319,6 +334,7 @@ function addBookmark() {
         pageNumber: activeVerseData.pageNumber,
         surahName: activeVerseData.surahName,
         folderId: currentViewingFolderId || null,
+        orderIndex: -(new Date().getTime()),
         timestamp: new Date().getTime(),
         deleted: false,
         hiddenWords: []
@@ -386,8 +402,8 @@ function setLastRead() {
     closeVersePopup();
     document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
 
-    if (localStorage.getItem('quran_gdrive_linked') === 'true' && driveAccessToken) {
-        performSync(true);
+    if (localStorage.getItem('quran_gdrive_linked') === 'true') {
+        if (checkAndRestoreToken()) performSync(true);
     }
 }
 
@@ -577,13 +593,13 @@ function filterSurah() {
 }
 
 /* =========================================
-   CUSTOM DRAG AND DROP (Folder Hit Detection)
+   CUSTOM DRAG AND DROP DENGAN HOLD DELAY
 ========================================= */
 const iconProps = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 const svgGrip = `<svg ${iconProps}><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line></svg>`;
 const svgFolder = `<svg ${iconProps}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
 const svgEdit = `<svg ${iconProps}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
-const svgTrash = `<svg ${iconProps}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path></svg>`;
+const svgTrash = `<svg ${iconProps}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
 const svgHistory = `<svg ${iconProps}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
 
 let dndState = {
@@ -592,27 +608,79 @@ let dndState = {
     targetFolderId: null, targetFolderEl: null
 };
 
+let dragContext = null;
+
 window.startDragItem = function(e, id, type) {
     if (e.type === 'mousedown' && e.button !== 0) return;
-    e.preventDefault();
 
     const btn = e.currentTarget;
     const item = btn.closest('.list-item');
-    dndState.listContainer = item.parentElement;
+    const startY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+    const startX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
+
+    dragContext = { e, id, type, item, startY, startX, timer: null, active: false };
+
+    dragContext.timer = setTimeout(() => {
+        if(!dragContext) return;
+        dragContext.active = true;
+        if (navigator.vibrate) navigator.vibrate(40);
+        executeDragStart(dragContext);
+    }, 250);
+
+    document.addEventListener('mousemove', handleDragMoveInit, {passive: false});
+    document.addEventListener('touchmove', handleDragMoveInit, {passive: false});
+    document.addEventListener('mouseup', cancelDragInit);
+    document.addEventListener('touchend', cancelDragInit);
+};
+
+function handleDragMoveInit(e) {
+    if (!dragContext) return;
+    const currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+    const currentX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
+
+    if (!dragContext.active) {
+        if (Math.abs(currentY - dragContext.startY) > 8 || Math.abs(currentX - dragContext.startX) > 8) {
+            cancelDragInit();
+        }
+    } else {
+        e.preventDefault();
+        onDragMove(e, currentY);
+    }
+}
+
+function cancelDragInit() {
+    if (dragContext && !dragContext.active) {
+        clearTimeout(dragContext.timer);
+        cleanupDragEvents();
+        dragContext = null;
+    } else if (dragContext && dragContext.active) {
+        onDragEnd();
+    }
+}
+
+function cleanupDragEvents() {
+    document.removeEventListener('mousemove', handleDragMoveInit);
+    document.removeEventListener('touchmove', handleDragMoveInit);
+    document.removeEventListener('mouseup', cancelDragInit);
+    document.removeEventListener('touchend', cancelDragInit);
+}
+
+function executeDragStart(ctx) {
+    dndState.listContainer = ctx.item.parentElement;
     dndState.scrollContainer = document.querySelector('.tab-pane.active');
 
-    dndState.type = type;
-    dndState.id = id;
-    dndState.el = item;
+    dndState.type = ctx.type;
+    dndState.id = ctx.id;
+    dndState.el = ctx.item;
     dndState.targetFolderId = null;
     dndState.targetFolderEl = null;
 
-    const rect = item.getBoundingClientRect();
-    dndState.startY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+    const rect = ctx.item.getBoundingClientRect();
+    dndState.startY = ctx.startY;
     dndState.currentY = dndState.startY;
     dndState.startTop = rect.top;
 
-    dndState.clone = item.cloneNode(true);
+    dndState.clone = ctx.item.cloneNode(true);
     dndState.clone.classList.add('dragging-clone');
     dndState.clone.style.width = rect.width + 'px';
     dndState.clone.style.height = rect.height + 'px';
@@ -624,20 +692,14 @@ window.startDragItem = function(e, id, type) {
     dndState.placeholder.className = 'drag-placeholder';
     dndState.placeholder.style.height = rect.height + 'px';
 
-    dndState.listContainer.insertBefore(dndState.placeholder, item);
-    item.style.display = 'none';
-
-    document.addEventListener('mousemove', onDragMove, {passive: false});
-    document.addEventListener('touchmove', onDragMove, {passive: false});
-    document.addEventListener('mouseup', onDragEnd);
-    document.addEventListener('touchend', onDragEnd);
+    dndState.listContainer.insertBefore(dndState.placeholder, ctx.item);
+    ctx.item.style.display = 'none';
 
     dndState.rafId = requestAnimationFrame(dragAutoScroll);
-};
+}
 
-function onDragMove(e) {
-    e.preventDefault();
-    dndState.currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+function onDragMove(e, currentY) {
+    dndState.currentY = currentY;
     const deltaY = dndState.currentY - dndState.startY;
     dndState.clone.style.top = (dndState.startTop + deltaY) + 'px';
 
@@ -664,7 +726,6 @@ function dragAutoScroll() {
         let isHoveringFolder = false;
 
         if (hitElement) {
-            // DETEKSI DROP KE FOLDER KHUSUS BOOKMARK DI ROOT VIEW
             if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
                 const hitFolder = hitElement.closest('.folder-item');
                 if (hitFolder && hitFolder !== dndState.el) {
@@ -679,7 +740,6 @@ function dragAutoScroll() {
                 }
             }
 
-            // NORMAL REORDERING JIKA TIDAK HOVER FOLDER
             if (!isHoveringFolder) {
                 if (dndState.targetFolderEl) {
                     dndState.targetFolderEl.classList.remove('drag-over-folder');
@@ -703,18 +763,15 @@ function dragAutoScroll() {
     }
 }
 
-function onDragEnd(e) {
-    document.removeEventListener('mousemove', onDragMove);
-    document.removeEventListener('touchmove', onDragMove);
-    document.removeEventListener('mouseup', onDragEnd);
-    document.removeEventListener('touchend', onDragEnd);
+function onDragEnd() {
+    cleanupDragEvents();
     cancelAnimationFrame(dndState.rafId);
+    dragContext = null;
 
     if (dndState.targetFolderEl) {
         dndState.targetFolderEl.classList.remove('drag-over-folder');
     }
 
-    // Eksekusi Logika Masukkan Bookmark ke Folder
     if (dndState.targetFolderId && dndState.type === 'bookmark') {
         const bm = appBookmarks.find(b => b.id === dndState.id);
         if (bm) {
@@ -722,43 +779,32 @@ function onDragEnd(e) {
             bm.timestamp = new Date().getTime();
             saveBookmarks();
             renderBookmarkTab();
-
             const folderName = appFolders.find(f => f.id === dndState.targetFolderId)?.name || '';
+            // PERBAIKAN: Menghapus br, cukup spasi
             showToast(`${t('bookmark_moved')} 📁 ${folderName}`);
         }
-
         if (dndState.placeholder) dndState.placeholder.remove();
         if (dndState.clone) dndState.clone.remove();
         if (dndState.el) dndState.el.style.display = 'flex';
 
     } else {
-        // Eksekusi Logika Reorder (Ubah Urutan)
         dndState.listContainer.insertBefore(dndState.el, dndState.placeholder);
         dndState.el.style.display = 'flex';
 
-        const newOrderIds = Array.from(dndState.listContainer.querySelectorAll('.list-item'))
-            .map(el => el.dataset.id)
-            .filter(id => id);
+        const elements = Array.from(dndState.listContainer.querySelectorAll('.list-item'));
+        elements.forEach((el, index) => {
+            const id = el.dataset.id;
+            if (id) {
+                let item = appFolders.find(f => f.id === id) || appBookmarks.find(b => b.id === id);
+                if(item && item.orderIndex !== index) {
+                    item.orderIndex = index;
+                    item.timestamp = new Date().getTime();
+                }
+            }
+        });
 
         if (dndState.placeholder) dndState.placeholder.remove();
         if (dndState.clone) dndState.clone.remove();
-
-        let orderMap = new Map();
-        newOrderIds.forEach((id, idx) => orderMap.set(id, idx));
-
-        if (dndState.type === 'folder') {
-            appFolders.forEach((f, idx) => { f._originalIdx = idx; f._tempSort = orderMap.has(f.id) ? orderMap.get(f.id) : 99999; });
-            appFolders.sort((a, b) => a._tempSort !== b._tempSort ? a._tempSort - b._tempSort : a._originalIdx - b._originalIdx);
-            appFolders.forEach(f => { delete f._tempSort; delete f._originalIdx; });
-            const movedItem = appFolders.find(f => f.id === dndState.id);
-            if(movedItem) movedItem.timestamp = new Date().getTime();
-        } else {
-            appBookmarks.forEach((b, idx) => { b._originalIdx = idx; b._tempSort = orderMap.has(b.id) ? orderMap.get(b.id) : 99999; });
-            appBookmarks.sort((a, b) => a._tempSort !== b._tempSort ? a._tempSort - b._tempSort : a._originalIdx - b._originalIdx);
-            appBookmarks.forEach(b => { delete b._tempSort; delete b._originalIdx; });
-            const movedItem = appBookmarks.find(b => b.id === dndState.id);
-            if(movedItem) movedItem.timestamp = new Date().getTime();
-        }
 
         saveBookmarks();
 
@@ -770,8 +816,8 @@ function onDragEnd(e) {
         }
     }
 
-    if (localStorage.getItem('quran_gdrive_linked') === 'true' && driveAccessToken) {
-        performSync(true);
+    if (localStorage.getItem('quran_gdrive_linked') === 'true') {
+        if (checkAndRestoreToken()) performSync(true);
     }
 
     dndState = {};
@@ -826,7 +872,7 @@ function renderBookmarkTab() {
     if(!folderList || !bookmarkList) return;
 
     let folderHtml = '';
-    const visibleFolders = appFolders.filter(f => !f.deleted);
+    const visibleFolders = sortItemsArray(appFolders.filter(f => !f.deleted));
 
     visibleFolders.forEach(folder => {
         const count = appBookmarks.filter(b => b.folderId === folder.id && !b.deleted).length;
@@ -855,7 +901,7 @@ function renderBookmarkTab() {
     if (visibleFolders.length > 0 && titleFolder) titleFolder.style.display = 'block';
     else if (titleFolder) titleFolder.style.display = 'none';
 
-    const rootBookmarks = appBookmarks.filter(b => !b.folderId && !b.deleted);
+    const rootBookmarks = sortItemsArray(appBookmarks.filter(b => !b.folderId && !b.deleted));
 
     if(rootBookmarks.length > 0) {
         if (titleSemua) titleSemua.style.display = 'block';
@@ -994,6 +1040,7 @@ function saveFolder() {
                 name: name,
                 color: tempFolderColor,
                 icon: tempFolderIcon,
+                orderIndex: -(new Date().getTime()),
                 timestamp: new Date().getTime(),
                 deleted: false
             });
@@ -1017,13 +1064,13 @@ function openMoveModal(bookmarkId) {
     bookmarkToMove = appBookmarks.find(b => b.id === bookmarkId);
     if(!bookmarkToMove) return;
     const list = document.getElementById('move-folder-list');
-    let html = `<div class="move-folder-item" onclick="executeMoveBookmark(null)">${t('root_folder')}</div>`;
+    let html = `<div class="move-folder-item" onclick="executeMoveBookmark(null)" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display:block;">${t('root_folder')}</div>`;
 
     appFolders.filter(f => !f.deleted).forEach(f => {
         let iconSvg = getFolderSvg(f.icon);
-        html += `<div class="move-folder-item" onclick="executeMoveBookmark('${f.id}')" style="display:flex; gap:8px; align-items:center;">
-                    <span style="color:${f.color || '#0D9488'}; display:flex; align-items:center;">${iconSvg}</span>
-                    <span>${f.name}</span>
+        html += `<div class="move-folder-item" onclick="executeMoveBookmark('${f.id}')" style="display:flex; gap:8px; align-items:center; box-sizing:border-box;">
+                    <span style="color:${f.color || '#0D9488'}; display:flex; align-items:center; flex-shrink: 0;">${iconSvg}</span>
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${f.name}</span>
                 </div>`;
     });
     list.innerHTML = html;
@@ -1038,6 +1085,7 @@ function closeMoveModal() {
 function executeMoveBookmark(folderId) {
     if(bookmarkToMove) {
         bookmarkToMove.folderId = folderId;
+        bookmarkToMove.orderIndex = -(new Date().getTime());
         bookmarkToMove.timestamp = new Date().getTime();
         saveBookmarks();
         if (currentViewingFolderId) {
@@ -1060,7 +1108,7 @@ function openFolderView(folderId, folderName) {
     document.querySelector('.bookmark-header-actions').style.display = 'none';
 
     const container = document.getElementById('folder-content-list');
-    const folderBookmarks = appBookmarks.filter(b => b.folderId === folderId && !b.deleted);
+    const folderBookmarks = sortItemsArray(appBookmarks.filter(b => b.folderId === folderId && !b.deleted));
 
     if(folderBookmarks.length === 0) {
         container.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-muted); font-size: 0.8rem;">${t('empty_folder')}</div>`;
@@ -1749,14 +1797,14 @@ function updateSettings() {
         renderBookmarkTab();
     }
 
-    if (localStorage.getItem('quran_gdrive_linked') === 'true' && driveAccessToken) {
-        performSync(true);
+    if (localStorage.getItem('quran_gdrive_linked') === 'true') {
+        if (checkAndRestoreToken()) performSync(true);
     }
 }
 
 function loadSettings() {
     const saved = localStorage.getItem('quran_settings');
-    if (saved) appSettings = Object.assign(appSettings, JSON.parse(saved));
+    if (saved) appSettings = Object.assign({}, appSettings, JSON.parse(saved));
     applySettingsToUI();
     applyUILanguage();
     applySettings();
@@ -1927,7 +1975,7 @@ window.addEventListener('resize', () => {
 document.addEventListener('DOMContentLoaded', initApp);
 
 /* =========================================
-   GOOGLE DRIVE SYNC LOGIC (TOMBSTONE MERGE)
+   GOOGLE DRIVE SYNC LOGIC
 ========================================= */
 let driveAccessToken = '';
 let tokenClient;
@@ -1945,6 +1993,10 @@ function initGoogleSync() {
         callback: (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
                 driveAccessToken = tokenResponse.access_token;
+
+                const expiryTime = new Date().getTime() + (tokenResponse.expires_in * 1000) - 60000;
+                localStorage.setItem('quran_gdrive_token', driveAccessToken);
+                localStorage.setItem('quran_gdrive_token_expiry', expiryTime.toString());
                 localStorage.setItem('quran_gdrive_linked', 'true');
 
                 fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -1994,6 +2046,27 @@ function updateSyncButtonUI() {
     }
 }
 
+function checkAndRestoreToken() {
+    if (driveAccessToken) {
+        const tokenExpiry = localStorage.getItem('quran_gdrive_token_expiry');
+        if (tokenExpiry && new Date().getTime() >= parseInt(tokenExpiry)) {
+            driveAccessToken = '';
+            return false;
+        }
+        return true;
+    }
+
+    const savedToken = localStorage.getItem('quran_gdrive_token');
+    const tokenExpiry = localStorage.getItem('quran_gdrive_token_expiry');
+    const now = new Date().getTime();
+
+    if (savedToken && tokenExpiry && now < parseInt(tokenExpiry)) {
+        driveAccessToken = savedToken;
+        return true;
+    }
+    return false;
+}
+
 function handleAuthClick() {
     if (!tokenClient) {
         showToast(t('sync_not_ready'));
@@ -2001,8 +2074,14 @@ function handleAuthClick() {
     }
 
     const isLinked = localStorage.getItem('quran_gdrive_linked') === 'true';
-    showToast(isLinked ? t('syncing') : t('auth_google'));
 
+    if (isLinked && checkAndRestoreToken()) {
+        showToast(t('syncing'));
+        performSync();
+        return;
+    }
+
+    showToast(isLinked ? t('syncing') : t('auth_google'));
     if (isLinked) {
         tokenClient.requestAccessToken({prompt: ''});
     } else {
@@ -2057,7 +2136,7 @@ async function performSync(isSilent = false) {
 
         if (remoteData.settings) {
             if (!appSettings.timestamp || (remoteData.settings.timestamp > appSettings.timestamp)) {
-                appSettings = Object.assign(appSettings, remoteData.settings);
+                appSettings = Object.assign({}, appSettings, remoteData.settings);
                 localStorage.setItem('quran_settings', JSON.stringify(appSettings));
                 applySettingsToUI();
                 applyUILanguage();
@@ -2117,7 +2196,12 @@ function mergeSyncData(localArr, remoteArr) {
         }
     });
 
-    return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    return Array.from(map.values()).sort((a, b) => {
+        const orderA = a.orderIndex !== undefined ? a.orderIndex : 999999;
+        const orderB = b.orderIndex !== undefined ? b.orderIndex : 999999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (b.timestamp || 0) - (a.timestamp || 0);
+    });
 }
 
 async function uploadToDriveRobust(dataObj) {

@@ -156,40 +156,40 @@
     </div>
 
     <div class="bottom-sheet" id="info-sheet">
-        <div class="drag-area" id="info-drag-area"><div class="drag-handle"></div></div>
+        <div class="drag-area" id="info-drag-area"><div class="drag-handle-sheet"></div></div>
         <div class="sheet-content" id="content-settings">
             <h3 class="sheet-title" data-i18n="settings_title">Pengaturan Membaca</h3>
 
             <div class="setting-item">
-                <label for="select-language" data-i18n="app_language">Bahasa / Language</label>
+                <span data-i18n="app_language" style="font-weight: 500; color: var(--text-main); font-size: 0.8rem;">Bahasa / Language</span>
                 <select id="select-language" onchange="updateSettings()" class="custom-select">
                     <option value="id">Indonesia</option>
                     <option value="en">English</option>
                 </select>
             </div>
             <div class="setting-item">
-                <label for="toggle-perkata" data-i18n="mode_perkata">Mode Perkata</label>
+                <span data-i18n="mode_perkata" style="font-weight: 500; color: var(--text-main); font-size: 0.8rem;">Mode Perkata</span>
                 <label class="switch">
                     <input type="checkbox" id="toggle-perkata" onchange="updateSettings()">
                     <span class="slider round"></span>
                 </label>
             </div>
             <div class="setting-item">
-                <label for="toggle-transliterasi" data-i18n="transliteration">Transliterasi (Latin)</label>
+                <span data-i18n="transliteration" style="font-weight: 500; color: var(--text-main); font-size: 0.8rem;">Transliterasi (Latin)</span>
                 <label class="switch">
                     <input type="checkbox" id="toggle-transliterasi" onchange="updateSettings()">
                     <span class="slider round"></span>
                 </label>
             </div>
             <div class="setting-item">
-                <label for="toggle-translation" data-i18n="show_translation">Tampilkan Terjemahan</label>
+                <span data-i18n="show_translation" style="font-weight: 500; color: var(--text-main); font-size: 0.8rem;">Tampilkan Terjemahan</span>
                 <label class="switch">
                     <input type="checkbox" id="toggle-translation" onchange="updateSettings()">
                     <span class="slider round"></span>
                 </label>
             </div>
             <div class="setting-item">
-                <label data-i18n="arabic_font_size">Ukuran Font Arab</label>
+                <span data-i18n="arabic_font_size" style="font-weight: 500; color: var(--text-main); font-size: 0.8rem;">Ukuran Font Arab</span>
                 <div class="font-controls">
                     <button class="font-size-btn" onclick="changeFontSize(-0.2)">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
