@@ -809,13 +809,13 @@ function saveFolder() {
     const name = document.getElementById('input-folder-name').value.trim();
     if(!name) { showToast(t('empty_folder_name')); return; }
 
-    closeFolderModal();
-
     if (editingFolderId) {
         const index = appFolders.findIndex(f => f.id === editingFolderId);
         if(index > -1) {
-            appFolders[index].name = name; appFolders[index].color = tempFolderColor;
-            appFolders[index].icon = tempFolderIcon; appFolders[index].timestamp = new Date().getTime();
+            appFolders[index].name = name;
+            appFolders[index].color = tempFolderColor;
+            appFolders[index].icon = tempFolderIcon;
+            appFolders[index].timestamp = new Date().getTime();
         }
     } else {
         appFolders.unshift({
@@ -823,12 +823,16 @@ function saveFolder() {
             orderIndex: -(new Date().getTime()), timestamp: new Date().getTime(), deleted: false
         });
     }
+
     saveBookmarks();
     if (currentViewingFolderId) {
         const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
         if (folder) openFolderView(folder.id, folder.name); else closeFolderView();
     } else renderBookmarkTab();
+
     showToast(t('folder_created'));
+
+    closeFolderModal();
 }
 
 function openMoveModal(bookmarkId) {
