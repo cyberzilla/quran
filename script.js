@@ -453,7 +453,7 @@ function filterSurah() {
 }
 
 /* =========================================
-   CUSTOM DRAG AND DROP - ANTI BUG (AGGRESSIVE CLEANUP)
+   CUSTOM DRAG AND DROP - OPTIMIZED (HARDWARE ACCELERATED & BATCHED DOM)
 ========================================= */
 const iconProps = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 const svgGrip = `<svg ${iconProps}><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line></svg>`;
@@ -477,6 +477,8 @@ window.startDragItem = function(e, id, type) {
     if (e.type === 'mousedown' && e.button !== 0) return;
     e.stopPropagation();
 
+    // OPTIMASI: Pastikan tidak ada event listeners yang menumpuk / duplicate
+    cleanupDragEvents();
     if (dragContext && dragContext.active) return;
     cleanupDnd();
 
@@ -500,7 +502,12 @@ window.startDragItem = function(e, id, type) {
     document.addEventListener('touchend', cancelDragInit);
     document.addEventListener('touchcancel', cancelDragInit);
     window.addEventListener('blur', cancelDragInit);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 };
+
+function handleVisibilityChange() {
+    if (document.hidden) cancelDragInit();
+}
 
 function handleDragMoveInit(e) {
     if (!dragContext) return;
@@ -518,13 +525,21 @@ function handleDragMoveInit(e) {
 function cancelDragInit() {
     if (dragContext && !dragContext.active) {
         clearTimeout(dragContext.timer); cleanupDragEvents(); dragContext = null;
-    } else if (dragContext && dragContext.active) onDragEnd();
+    } else if (dragContext && dragContext.active) {
+        onDragEnd(); // Force end drag gracefully
+    } else {
+        cleanupDnd(); // Fallback prevent ghost items
+    }
 }
 
 function cleanupDragEvents() {
-    document.removeEventListener('mousemove', handleDragMoveInit); document.removeEventListener('touchmove', handleDragMoveInit);
-    document.removeEventListener('mouseup', cancelDragInit); document.removeEventListener('touchend', cancelDragInit);
-    document.removeEventListener('touchcancel', cancelDragInit); window.removeEventListener('blur', cancelDragInit);
+    document.removeEventListener('mousemove', handleDragMoveInit);
+    document.removeEventListener('touchmove', handleDragMoveInit);
+    document.removeEventListener('mouseup', cancelDragInit);
+    document.removeEventListener('touchend', cancelDragInit);
+    document.removeEventListener('touchcancel', cancelDragInit);
+    window.removeEventListener('blur', cancelDragInit);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
 }
 
 function executeDragStart(ctx) {
@@ -533,14 +548,19 @@ function executeDragStart(ctx) {
     dndState.type = ctx.type; dndState.id = ctx.id; dndState.el = ctx.item;
 
     const rect = ctx.item.getBoundingClientRect();
-    dndState.startY = ctx.startY; dndState.startTop = rect.top;
+    dndState.startY = ctx.startY;
+    dndState.startTop = rect.top;
 
     dndState.clone = ctx.item.cloneNode(true);
     dndState.clone.classList.add('dragging-clone');
     dndState.clone.style.width = rect.width + 'px';
     dndState.clone.style.height = rect.height + 'px';
-    dndState.clone.style.left = rect.left + 'px';
+    // OPTIMASI: Setup awal untuk GPU acceleration
     dndState.clone.style.top = rect.top + 'px';
+    dndState.clone.style.left = rect.left + 'px';
+    dndState.clone.style.margin = '0';
+    dndState.clone.style.transform = 'translate3d(0px, 0px, 0px)';
+
     document.body.appendChild(dndState.clone);
 
     dndState.placeholder = document.createElement('div');
@@ -555,7 +575,8 @@ function executeDragStart(ctx) {
 
 function onDragMove(currentY) {
     const deltaY = currentY - dndState.startY;
-    dndState.clone.style.top = (dndState.startTop + deltaY) + 'px';
+    // OPTIMASI: Menggunakan transform alih-alih merubah .top (Hardware Accelerated)
+    dndState.clone.style.transform = `translate3d(0px, ${deltaY}px, 0px)`;
 
     const scrollRect = dndState.scrollContainer.getBoundingClientRect();
     if (currentY < scrollRect.top + 70) dndState.autoScrollDir = -1;
@@ -566,26 +587,42 @@ function onDragMove(currentY) {
 function dragAutoScroll() {
     if (!dndState.clone || !dndState.listContainer) { cleanupDnd(); return; }
 
-    if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
+    if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) {
+        dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
+    }
 
     const cloneRect = dndState.clone.getBoundingClientRect();
     const hitY = cloneRect.top + cloneRect.height / 2;
     let isHoveringFolder = false;
 
-    // Menghitung bounding box item secara matematis tanpa elementFromPoint
+    // OPTIMASI: Mencegah Layout Thrashing (Pisahkan READ dan WRITE ke DOM)
+    let folderRects = [];
+    let itemRects = [];
+
+    // FASE READ: Kumpulkan semua koordinat
     if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
         const folders = Array.from(dndState.listContainer.querySelectorAll('.folder-item:not(.dragging-clone)'));
-        for (let folder of folders) {
-            const rect = folder.getBoundingClientRect();
-            if (hitY >= rect.top && hitY <= rect.bottom) {
-                isHoveringFolder = true;
-                if (dndState.targetFolderEl !== folder) {
-                    if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
-                    dndState.targetFolderEl = folder; dndState.targetFolderId = folder.dataset.id;
-                    folder.classList.add('drag-over-folder'); dndState.placeholder.style.display = 'none';
-                }
-                break;
+        for(let f of folders) {
+            folderRects.push({ el: f, top: f.getBoundingClientRect().top, bottom: f.getBoundingClientRect().bottom });
+        }
+    }
+
+    const items = Array.from(dndState.listContainer.querySelectorAll('.list-item:not(.dragging-clone)'));
+    for(let i of items) {
+        const rect = i.getBoundingClientRect();
+        itemRects.push({ el: i, midpoint: rect.top + rect.height / 2 });
+    }
+
+    // FASE WRITE: Manipulasi DOM setelah pembacaan selesai
+    for (let f of folderRects) {
+        if (hitY >= f.top && hitY <= f.bottom) {
+            isHoveringFolder = true;
+            if (dndState.targetFolderEl !== f.el) {
+                if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
+                dndState.targetFolderEl = f.el; dndState.targetFolderId = f.el.dataset.id;
+                f.el.classList.add('drag-over-folder'); dndState.placeholder.style.display = 'none';
             }
+            break;
         }
     }
 
@@ -595,22 +632,30 @@ function dragAutoScroll() {
             dndState.targetFolderEl = null; dndState.targetFolderId = null;
             dndState.placeholder.style.display = 'block';
         }
-        const items = Array.from(dndState.listContainer.querySelectorAll('.list-item:not(.dragging-clone)'));
-        let inserted = false;
-        for (let item of items) {
-            const rect = item.getBoundingClientRect();
-            if (hitY < rect.top + rect.height / 2) {
-                dndState.listContainer.insertBefore(dndState.placeholder, item); inserted = true; break;
+
+        let targetItem = null;
+        for (let i of itemRects) {
+            if (hitY < i.midpoint) { targetItem = i.el; break; }
+        }
+
+        // Cegah DOM update yang redundan
+        if (targetItem) {
+            if (targetItem.previousElementSibling !== dndState.placeholder) {
+                dndState.listContainer.insertBefore(dndState.placeholder, targetItem);
+            }
+        } else {
+            if (dndState.listContainer.lastElementChild !== dndState.placeholder) {
+                dndState.listContainer.appendChild(dndState.placeholder);
             }
         }
-        if (!inserted) dndState.listContainer.appendChild(dndState.placeholder);
     }
 
     if(dndState.rafId) dndState.rafId = requestAnimationFrame(dragAutoScroll);
 }
 
 function onDragEnd() {
-    cleanupDragEvents(); dragContext = null;
+    cleanupDragEvents();
+    dragContext = null;
     if (!dndState.clone || !dndState.listContainer) { cleanupDnd(); return; }
 
     if (dndState.targetFolderId && dndState.type === 'bookmark') {
