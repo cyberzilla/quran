@@ -200,9 +200,38 @@ body {
 .drag-handle { cursor: grab; touch-action: none; }
 .drag-handle:active { cursor: grabbing; }
 
-.dragging-clone { position: fixed; z-index: 999999; pointer-events: none; box-shadow: 0 15px 40px rgba(0,0,0,0.15); opacity: 0.95; background: var(--card-bg); border-radius: 12px; margin: 0; border: 1px solid var(--primary); box-sizing: border-box; display: flex !important; flex-direction: row !important; }
-.drag-placeholder { background: var(--primary-light); border: 2px dashed var(--primary); border-radius: 12px; margin-bottom: 8px; opacity: 0.5; width: 100%; box-sizing: border-box; }
-.folder-item.drag-over-folder { transform: scale(1.02); border: 2px dashed var(--primary); background-color: var(--primary-light); box-shadow: 0 5px 15px rgba(13, 148, 136, 0.2); }
+.dragging-clone {
+    position: fixed;
+    z-index: 999999;
+    pointer-events: none;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    opacity: 0.95;
+    background: var(--card-bg);
+    border-radius: 12px;
+    margin: 0 !important;
+    border: 1px solid var(--primary);
+    box-sizing: border-box;
+    display: flex !important;
+    /* Tidak perlu height: auto, karena tinggi sudah dicetak presisi oleh JS */
+}
+
+.drag-placeholder {
+    background: var(--primary-light);
+    border: 2px dashed var(--primary);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+    box-sizing: border-box;
+    /* Lebar dan tinggi sudah diatur otomatis oleh Javascript */
+}
+
+/* Garis putus-putus tebal hanya akan muncul saat didekatkan ke folder */
+.folder-item.drag-over-folder {
+    transform: scale(1.02);
+    border: 2px dashed var(--primary);
+    background-color: var(--primary-light);
+    box-shadow: 0 5px 15px rgba(13, 148, 136, 0.2);
+}
 
 .folder-bookmark-arabic { display: flex; flex-wrap: wrap; direction: rtl; justify-content: flex-start; gap: 4px 6px; font-family:'dkip', serif; font-size:var(--arabic-font-size); width: 100%; max-width: 100%; box-sizing: border-box; line-height: 1.7; }
 .folder-word { transition: all 0.3s ease; }

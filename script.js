@@ -524,22 +524,41 @@ function cleanupDragEvents() {
 function executeDragStart(ctx) {
     dndState.listContainer = ctx.item.parentElement;
     dndState.scrollContainer = document.querySelector('.tab-pane.active');
-    dndState.type = ctx.type; dndState.id = ctx.id; dndState.el = ctx.item;
+    dndState.type = ctx.type;
+    dndState.id = ctx.id;
+    dndState.el = ctx.item;
 
+    // MATIKAN EFEK MENGECIL SEMENTARA UNTUK MENGAMBIL UKURAN ASLI 100%
+    const originalTransform = ctx.item.style.transform;
+    const originalTransition = ctx.item.style.transition;
+    ctx.item.style.transition = 'none';
+    ctx.item.style.transform = 'none';
+
+    // Sekarang ukuran, tinggi, dan posisi yang didapat akan sangat akurat
     const rect = ctx.item.getBoundingClientRect();
-    dndState.startY = ctx.startY; dndState.startTop = rect.top;
+
+    // Kembalikan style seperti semula
+    ctx.item.style.transform = originalTransform;
+    ctx.item.style.transition = originalTransition;
+
+    dndState.startY = ctx.startY;
+    dndState.startTop = rect.top;
 
     dndState.clone = ctx.item.cloneNode(true);
     dndState.clone.classList.add('dragging-clone');
+
+    // UKURAN DAN POSISI DIJAMIN IDENTIK
     dndState.clone.style.width = rect.width + 'px';
     dndState.clone.style.height = rect.height + 'px';
     dndState.clone.style.left = rect.left + 'px';
     dndState.clone.style.top = rect.top + 'px';
     document.body.appendChild(dndState.clone);
 
+    // BIKIN PLACEHOLDER (GARIS PUTUS-PUTUS) IDENTIK
     dndState.placeholder = document.createElement('div');
     dndState.placeholder.className = 'drag-placeholder';
     dndState.placeholder.style.height = rect.height + 'px';
+    dndState.placeholder.style.width = rect.width + 'px';
 
     dndState.listContainer.insertBefore(dndState.placeholder, ctx.item);
     ctx.item.style.display = 'none';
@@ -812,10 +831,8 @@ function saveFolder() {
     if (editingFolderId) {
         const index = appFolders.findIndex(f => f.id === editingFolderId);
         if(index > -1) {
-            appFolders[index].name = name;
-            appFolders[index].color = tempFolderColor;
-            appFolders[index].icon = tempFolderIcon;
-            appFolders[index].timestamp = new Date().getTime();
+            appFolders[index].name = name; appFolders[index].color = tempFolderColor;
+            appFolders[index].icon = tempFolderIcon; appFolders[index].timestamp = new Date().getTime();
         }
     } else {
         appFolders.unshift({
@@ -823,7 +840,6 @@ function saveFolder() {
             orderIndex: -(new Date().getTime()), timestamp: new Date().getTime(), deleted: false
         });
     }
-
     saveBookmarks();
     if (currentViewingFolderId) {
         const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
@@ -832,6 +848,7 @@ function saveFolder() {
 
     showToast(t('folder_created'));
 
+    // PERBAIKAN: Fungsi penutup modal dipindah ke baris paling akhir
     closeFolderModal();
 }
 
