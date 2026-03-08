@@ -212,13 +212,14 @@ function formatTranslation(text) {
             result += `<span class="footnote fn-d${dClass}">[`;
         } else if (text[i] === ']') {
             result += `]</span>`; if (depth > 0) depth--;
-        } else result += text[i];
+        } else {
+            result += text[i];
+        }
     }
     while (depth > 0) { result += `</span>`; depth--; }
     return result;
 }
 
-// FUZZY SEARCH HELPER: Mengubah "An-Nās" menjadi "annas"
 function normalizeText(str) {
     if(!str) return "";
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/['"‘`’\-]/g, "").toLowerCase();
@@ -465,15 +466,18 @@ let dndState = { el: null, clone: null, placeholder: null, startY: 0, startTop: 
 let dragContext = null;
 
 function cleanupDnd() {
+    if (dndState.rafId) { cancelAnimationFrame(dndState.rafId); dndState.rafId = null; }
     document.querySelectorAll('.dragging-clone, .drag-placeholder').forEach(el => el.remove());
     document.querySelectorAll('.drag-over-folder').forEach(el => el.classList.remove('drag-over-folder'));
-    if (dndState.el) dndState.el.style.display = 'flex';
-    cancelAnimationFrame(dndState.rafId);
+    if (dndState.el) dndState.el.style.display = '';
     dndState = { el: null, clone: null, placeholder: null, startY: 0, startTop: 0, type: '', id: '', scrollContainer: null, autoScrollDir: 0, rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null };
 }
 
 window.startDragItem = function(e, id, type) {
     if (e.type === 'mousedown' && e.button !== 0) return;
+    e.stopPropagation();
+
+    if (dragContext && dragContext.active) return;
     cleanupDnd();
 
     const btn = e.currentTarget;
@@ -502,10 +506,12 @@ function handleDragMoveInit(e) {
     if (!dragContext) return;
     const currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
     const currentX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
+
     if (!dragContext.active) {
         if (Math.abs(currentY - dragContext.startY) > 8 || Math.abs(currentX - dragContext.startX) > 8) cancelDragInit();
     } else {
-        e.preventDefault(); onDragMove(currentY);
+        e.preventDefault();
+        onDragMove(currentY);
     }
 }
 
@@ -558,52 +564,54 @@ function onDragMove(currentY) {
 }
 
 function dragAutoScroll() {
+    if (!dndState.clone || !dndState.listContainer) { cleanupDnd(); return; }
+
     if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
-    if(dndState.clone) {
-        const cloneRect = dndState.clone.getBoundingClientRect();
-        const hitX = cloneRect.left + cloneRect.width / 2;
-        const hitY = cloneRect.top + cloneRect.height / 2;
 
-        dndState.clone.style.display = 'none';
-        const hitElement = document.elementFromPoint(hitX, hitY);
-        dndState.clone.style.display = 'flex';
+    const cloneRect = dndState.clone.getBoundingClientRect();
+    const hitY = cloneRect.top + cloneRect.height / 2;
+    let isHoveringFolder = false;
 
-        let isHoveringFolder = false;
-        if (hitElement) {
-            if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
-                const hitFolder = hitElement.closest('.folder-item');
-                if (hitFolder && hitFolder !== dndState.el) {
-                    isHoveringFolder = true;
-                    if (dndState.targetFolderEl !== hitFolder) {
-                        if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
-                        dndState.targetFolderEl = hitFolder; dndState.targetFolderId = hitFolder.dataset.id;
-                        hitFolder.classList.add('drag-over-folder'); dndState.placeholder.style.display = 'none';
-                    }
+    // Menghitung bounding box item secara matematis tanpa elementFromPoint
+    if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
+        const folders = Array.from(dndState.listContainer.querySelectorAll('.folder-item:not(.dragging-clone)'));
+        for (let folder of folders) {
+            const rect = folder.getBoundingClientRect();
+            if (hitY >= rect.top && hitY <= rect.bottom) {
+                isHoveringFolder = true;
+                if (dndState.targetFolderEl !== folder) {
+                    if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
+                    dndState.targetFolderEl = folder; dndState.targetFolderId = folder.dataset.id;
+                    folder.classList.add('drag-over-folder'); dndState.placeholder.style.display = 'none';
                 }
-            }
-
-            if (!isHoveringFolder) {
-                if (dndState.targetFolderEl) {
-                    dndState.targetFolderEl.classList.remove('drag-over-folder');
-                    dndState.targetFolderEl = null; dndState.targetFolderId = null;
-                    dndState.placeholder.style.display = 'block';
-                }
-
-                const hitItem = hitElement.closest('.list-item:not(.dragging-clone)');
-                if (hitItem && hitItem.parentElement === dndState.listContainer) {
-                    const hitRect = hitItem.getBoundingClientRect();
-                    if (hitY < hitRect.top + hitRect.height / 2) dndState.listContainer.insertBefore(dndState.placeholder, hitItem);
-                    else dndState.listContainer.insertBefore(dndState.placeholder, hitItem.nextSibling);
-                }
+                break;
             }
         }
-        dndState.rafId = requestAnimationFrame(dragAutoScroll);
     }
+
+    if (!isHoveringFolder) {
+        if (dndState.targetFolderEl) {
+            dndState.targetFolderEl.classList.remove('drag-over-folder');
+            dndState.targetFolderEl = null; dndState.targetFolderId = null;
+            dndState.placeholder.style.display = 'block';
+        }
+        const items = Array.from(dndState.listContainer.querySelectorAll('.list-item:not(.dragging-clone)'));
+        let inserted = false;
+        for (let item of items) {
+            const rect = item.getBoundingClientRect();
+            if (hitY < rect.top + rect.height / 2) {
+                dndState.listContainer.insertBefore(dndState.placeholder, item); inserted = true; break;
+            }
+        }
+        if (!inserted) dndState.listContainer.appendChild(dndState.placeholder);
+    }
+
+    if(dndState.rafId) dndState.rafId = requestAnimationFrame(dragAutoScroll);
 }
 
 function onDragEnd() {
     cleanupDragEvents(); dragContext = null;
-    if (!dndState.clone) { cleanupDnd(); return; }
+    if (!dndState.clone || !dndState.listContainer) { cleanupDnd(); return; }
 
     if (dndState.targetFolderId && dndState.type === 'bookmark') {
         const bm = appBookmarks.find(b => b.id === dndState.id);
@@ -715,7 +723,9 @@ function renderBookmarkTab() {
         if (visibleFolders.length === 0 && (!appLastRead || appLastRead.items.length === 0)) {
             bookmarkList.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-muted); font-size: 0.75rem;">${t('empty_library')}</div>`;
             return;
-        } else bookmarkList.innerHTML = '';
+        } else {
+            bookmarkList.innerHTML = '';
+        }
     }
 
     let bHtml = '';
@@ -809,8 +819,6 @@ function saveFolder() {
     const name = document.getElementById('input-folder-name').value.trim();
     if(!name) { showToast(t('empty_folder_name')); return; }
 
-    closeFolderModal();
-
     if (editingFolderId) {
         const index = appFolders.findIndex(f => f.id === editingFolderId);
         if(index > -1) {
@@ -828,7 +836,8 @@ function saveFolder() {
         const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
         if (folder) openFolderView(folder.id, folder.name); else closeFolderView();
     } else renderBookmarkTab();
-    showToast(t('folder_created'));
+
+    closeFolderModal(); showToast(t('folder_created'));
 }
 
 function openMoveModal(bookmarkId) {
@@ -844,8 +853,7 @@ function openMoveModal(bookmarkId) {
                     <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${f.name}</span>
                 </div>`;
     });
-    list.innerHTML = html;
-    document.getElementById('folder-move-modal').classList.add('active');
+    list.innerHTML = html; document.getElementById('folder-move-modal').classList.add('active');
 }
 
 function closeMoveModal() { document.getElementById('folder-move-modal').classList.remove('active'); bookmarkToMove = null; }
