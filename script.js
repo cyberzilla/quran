@@ -253,7 +253,6 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// PERBAIKAN: Membungkus pesan dalam elemen span .toast-inner agar styling line-clamp stabil
 function showToast(message) {
     const toast = document.getElementById('toast');
     if(!toast) return;
@@ -377,6 +376,44 @@ function removeBookmark(id) {
     }
     showToast(t('bookmark_removed'));
 }
+
+/* =========================================
+   FUNGSI FOLDER YANG HILANG DIKEMBALIKAN
+========================================= */
+function promptDeleteFolder(id) {
+    showConfirm(t('delete_folder_title'), t('delete_folder_msg'), () => {
+        deleteFolder(id);
+    });
+}
+
+function deleteFolder(id) {
+    const now = new Date().getTime();
+
+    // Tandai folder terhapus
+    const index = appFolders.findIndex(f => f.id === id);
+    if (index > -1) {
+        appFolders[index].deleted = true;
+        appFolders[index].timestamp = now;
+    }
+
+    // Tandai semua bookmark di dalam folder tersebut sebagai terhapus
+    appBookmarks.forEach(b => {
+        if (b.folderId === id) {
+            b.deleted = true;
+            b.timestamp = now;
+        }
+    });
+
+    saveBookmarks();
+    renderBookmarkTab();
+    showToast(t('folder_deleted'));
+
+    // Sinkronisasi background jika terhubung dengan Google Drive
+    if (localStorage.getItem('quran_gdrive_linked') === 'true') {
+        if (checkAndRestoreToken()) performSync(true);
+    }
+}
+/* ========================================= */
 
 function setLastRead() {
     if(!activeVerseData) return;
@@ -780,7 +817,6 @@ function onDragEnd() {
             saveBookmarks();
             renderBookmarkTab();
             const folderName = appFolders.find(f => f.id === dndState.targetFolderId)?.name || '';
-            // PERBAIKAN: Menghapus br, cukup spasi
             showToast(`${t('bookmark_moved')} 📁 ${folderName}`);
         }
         if (dndState.placeholder) dndState.placeholder.remove();
@@ -2129,8 +2165,17 @@ async function performSync(isSilent = false) {
         appFolders = mergeSyncData(appFolders, remoteData.folders);
 
         if (remoteData.lastRead) {
-            if (!appLastRead.timestamp || (remoteData.lastRead.timestamp > appLastRead.timestamp)) {
-                appLastRead = remoteData.lastRead;
+            let rLastRead = remoteData.lastRead;
+            if (!rLastRead.items) {
+                if (Array.isArray(rLastRead)) {
+                    rLastRead = { items: rLastRead, timestamp: rLastRead[0]?.timestamp || new Date().getTime() };
+                } else {
+                    rLastRead = { items: [rLastRead], timestamp: rLastRead.timestamp || new Date().getTime() };
+                }
+            }
+
+            if (!appLastRead || !appLastRead.timestamp || (rLastRead.timestamp > appLastRead.timestamp)) {
+                appLastRead = rLastRead;
             }
         }
 
