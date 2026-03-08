@@ -197,10 +197,11 @@ body {
 .action-btn.danger { color: #ef4444; }
 .action-btn.danger:active { background: rgba(239, 68, 68, 0.1); }
 
-.drag-handle { cursor: grab; touch-action: none; }
+.drag-handle { cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
 .drag-handle:active { cursor: grabbing; }
 
-.dragging-clone { position: fixed; z-index: 999999; pointer-events: none; box-shadow: 0 15px 40px rgba(0,0,0,0.15); opacity: 0.95; background: var(--card-bg); border-radius: 12px; margin: 0; border: 1px solid var(--primary); box-sizing: border-box; display: flex !important; flex-direction: row !important; }
+/* will-change: transform → GPU layer, menghilangkan jank saat drag */
+.dragging-clone { position: fixed; z-index: 999999; pointer-events: none; box-shadow: 0 15px 40px rgba(0,0,0,0.15); opacity: 0.95; background: var(--card-bg); border-radius: 12px; margin: 0; border: 1px solid var(--primary); box-sizing: border-box; display: flex !important; flex-direction: row !important; will-change: top; transform: translateZ(0); -webkit-transform: translateZ(0); }
 .drag-placeholder { background: var(--primary-light); border: 2px dashed var(--primary); border-radius: 12px; margin-bottom: 8px; opacity: 0.5; width: 100%; box-sizing: border-box; }
 .folder-item.drag-over-folder { transform: scale(1.02); border: 2px dashed var(--primary); background-color: var(--primary-light); box-shadow: 0 5px 15px rgba(13, 148, 136, 0.2); }
 
