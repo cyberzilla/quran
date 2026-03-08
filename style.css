@@ -464,6 +464,7 @@ body {
 .modal-box {
     background: var(--card-bg); border-radius: 16px; width: 90%; max-width: 350px;
     padding: 15px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); transform: scale(0.95); transition: transform 0.3s ease;
+    display: flex; flex-direction: column;
 }
 .modal-container.active .modal-box { transform: scale(1); }
 .modal-title { margin-top: 0; margin-bottom: 12px; font-size: 0.85rem; font-weight: 600; color: var(--text-main); text-align: center; }
@@ -472,7 +473,7 @@ body {
     font-size: 0.8rem; color: var(--text-main); background: var(--bg-body); box-sizing: border-box; outline: none; margin-bottom: 15px;
 }
 .modal-input:focus { border-color: var(--primary); }
-.modal-actions { display: flex; gap: 8px; }
+.modal-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .btn-cancel, .btn-primary {
     flex: 1; padding: 10px; border-radius: 10px; font-weight: 600; font-size: 0.8rem; cursor: pointer; border: none; transition: background 0.2s;
 }
@@ -597,7 +598,6 @@ input:checked + .slider:before { transform: translateX(18px); }
     box-shadow: none; border-color: transparent;
 }
 
-/* STYLING UNTUK FOOTNOTE BERSARANG (NESTED) DI DALAM TERJEMAHAN */
 .footnote {
     font-size: 0.9em;
     padding: 0 2px;
@@ -608,11 +608,24 @@ input:checked + .slider:before { transform: translateX(18px); }
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
 }
-/* Kedalaman 1: Toska (Primary) */
 .fn-d1 { color: var(--primary); background-color: var(--primary-light); }
-/* Kedalaman 2: Oranye/Amber */
 .fn-d2 { color: #D97706; background-color: rgba(217, 119, 6, 0.1); }
-/* Kedalaman 3: Biru */
 .fn-d3 { color: #2563EB; background-color: rgba(37, 99, 235, 0.1); }
-/* Kedalaman 4+: Merah/Rose */
 .fn-d4 { color: #E11D48; background-color: rgba(225, 29, 72, 0.1); }
+
+/* CUSTOM FOLDER: Color & Icon Picker */
+.color-picker { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.color-circle {
+    width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+    border: 3px solid transparent; transition: transform 0.2s;
+    box-sizing: border-box;
+}
+.color-circle.active { transform: scale(1.15); border-color: var(--text-main); }
+
+.icon-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px;}
+.icon-box {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--bg-body);
+    display: flex; justify-content: center; align-items: center; cursor: pointer;
+    transition: all 0.2s; color: var(--text-muted); border: 1px solid var(--border-color);
+}
+.icon-box.active { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }

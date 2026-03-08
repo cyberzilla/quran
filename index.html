@@ -69,7 +69,7 @@
                     </div>
 
                     <div style="display: flex; gap: 8px; width: 100%;">
-                        <button class="btn-create-folder" onclick="openCreateFolderModal()" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 8px 5px;" data-i18n="create_folder">
+                        <button class="btn-create-folder" onclick="openFolderModal(false)" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 8px 5px;" data-i18n="create_folder">
                             + Buat Folder
                         </button>
                         <button class="btn-create-folder" id="btn-sync-drive" onclick="handleAuthClick()" style="flex: 1; background-color: #4285F4; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 8px 5px;">
@@ -227,13 +227,20 @@
         </div>
     </div>
 
-    <div class="modal-container" id="folder-create-modal">
+    <div class="modal-container" id="folder-modal">
         <div class="modal-box">
-            <h3 class="modal-title" data-i18n="create_folder_title">Buat Folder Baru</h3>
+            <h3 class="modal-title" id="folder-modal-title" data-i18n="create_folder_title">Buat Folder Baru</h3>
             <input type="text" id="input-folder-name" class="modal-input" data-i18n-placeholder="folder_name_placeholder" placeholder="Nama Folder...">
-            <div class="modal-actions">
+
+            <label style="font-size:0.75rem; font-weight:600; color:var(--text-main); margin-bottom:6px; display:block;" data-i18n="folder_color">Warna</label>
+            <div class="color-picker" id="folder-color-picker"></div>
+
+            <label style="font-size:0.75rem; font-weight:600; color:var(--text-main); margin-top:8px; margin-bottom:6px; display:block;" data-i18n="folder_icon">Ikon</label>
+            <div class="icon-picker" id="folder-icon-picker"></div>
+
+            <div class="modal-actions" style="margin-top: 15px;">
                 <button class="btn-cancel" onclick="closeFolderModal()" data-i18n="cancel">Batal</button>
-                <button class="btn-primary" onclick="executeCreateFolder()" data-i18n="save">Simpan</button>
+                <button class="btn-primary" onclick="saveFolder()" data-i18n="save">Simpan</button>
             </div>
         </div>
     </div>
@@ -244,6 +251,16 @@
             <div class="move-folder-list" id="move-folder-list"></div>
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeMoveModal()" data-i18n="cancel">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-container" id="last-read-history-modal">
+        <div class="modal-box" style="max-height: 80vh; display:flex; flex-direction:column;">
+            <h3 class="modal-title" data-i18n="history_title">Riwayat Terakhir Dibaca</h3>
+            <div id="last-read-history-list" style="overflow-y:auto; flex:1; margin-bottom:15px; scrollbar-width:none;"></div>
+            <div class="modal-actions" style="flex-shrink:0;">
+                <button class="btn-primary" style="width:100%;" onclick="closeLastReadHistory()" data-i18n="close">Tutup</button>
             </div>
         </div>
     </div>
