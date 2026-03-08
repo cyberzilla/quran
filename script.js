@@ -284,7 +284,6 @@ function loadBookmarks() {
         appBookmarks = JSON.parse(localStorage.getItem('quran_bookmarks') || '[]');
         appFolders = JSON.parse(localStorage.getItem('quran_folders') || '[]');
 
-        // MIGRATION LAST READ: Mendukung 10 List History
         let savedLR = JSON.parse(localStorage.getItem('quran_last_read') || 'null');
         if (savedLR) {
             if (savedLR.items && Array.isArray(savedLR.items)) {
@@ -375,11 +374,9 @@ function setLastRead() {
         timestamp: new Date().getTime()
     };
 
-    // Mencegah duplikat (hapus ayat yang sama jika sudah ada di history)
     appLastRead.items = appLastRead.items.filter(item => !(item.surahId === newItem.surahId && item.verseId === newItem.verseId));
-
-    appLastRead.items.unshift(newItem); // Taruh di urutan teratas
-    if(appLastRead.items.length > 10) appLastRead.items.pop(); // Batasi hanya 10 item
+    appLastRead.items.unshift(newItem);
+    if(appLastRead.items.length > 10) appLastRead.items.pop();
 
     appLastRead.timestamp = new Date().getTime();
 
@@ -579,97 +576,208 @@ function filterSurah() {
     });
 }
 
-function moveFolder(id, dir) {
-    const fIndex = appFolders.findIndex(f => f.id === id);
-    if (fIndex === -1) return;
-    let targetIndex = fIndex + dir;
-    if (targetIndex >= 0 && targetIndex < appFolders.length) {
-        const temp = appFolders[fIndex];
-        appFolders[fIndex] = appFolders[targetIndex];
-        appFolders[targetIndex] = temp;
+/* =========================================
+   CUSTOM DRAG AND DROP (Folder Hit Detection)
+========================================= */
+const iconProps = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const svgGrip = `<svg ${iconProps}><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line></svg>`;
+const svgFolder = `<svg ${iconProps}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+const svgEdit = `<svg ${iconProps}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+const svgTrash = `<svg ${iconProps}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path></svg>`;
+const svgHistory = `<svg ${iconProps}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
 
-        const now = new Date().getTime();
-        appFolders[fIndex].timestamp = now;
-        appFolders[targetIndex].timestamp = now;
+let dndState = {
+    el: null, clone: null, placeholder: null, startY: 0, startTop: 0, type: '', id: '',
+    scrollContainer: null, autoScrollDir: 0, rafId: null, listContainer: null, currentY: 0,
+    targetFolderId: null, targetFolderEl: null
+};
 
-        saveBookmarks();
-        renderBookmarkTab();
+window.startDragItem = function(e, id, type) {
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    e.preventDefault();
+
+    const btn = e.currentTarget;
+    const item = btn.closest('.list-item');
+    dndState.listContainer = item.parentElement;
+    dndState.scrollContainer = document.querySelector('.tab-pane.active');
+
+    dndState.type = type;
+    dndState.id = id;
+    dndState.el = item;
+    dndState.targetFolderId = null;
+    dndState.targetFolderEl = null;
+
+    const rect = item.getBoundingClientRect();
+    dndState.startY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+    dndState.currentY = dndState.startY;
+    dndState.startTop = rect.top;
+
+    dndState.clone = item.cloneNode(true);
+    dndState.clone.classList.add('dragging-clone');
+    dndState.clone.style.width = rect.width + 'px';
+    dndState.clone.style.height = rect.height + 'px';
+    dndState.clone.style.left = rect.left + 'px';
+    dndState.clone.style.top = rect.top + 'px';
+    document.body.appendChild(dndState.clone);
+
+    dndState.placeholder = document.createElement('div');
+    dndState.placeholder.className = 'drag-placeholder';
+    dndState.placeholder.style.height = rect.height + 'px';
+
+    dndState.listContainer.insertBefore(dndState.placeholder, item);
+    item.style.display = 'none';
+
+    document.addEventListener('mousemove', onDragMove, {passive: false});
+    document.addEventListener('touchmove', onDragMove, {passive: false});
+    document.addEventListener('mouseup', onDragEnd);
+    document.addEventListener('touchend', onDragEnd);
+
+    dndState.rafId = requestAnimationFrame(dragAutoScroll);
+};
+
+function onDragMove(e) {
+    e.preventDefault();
+    dndState.currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+    const deltaY = dndState.currentY - dndState.startY;
+    dndState.clone.style.top = (dndState.startTop + deltaY) + 'px';
+
+    const scrollRect = dndState.scrollContainer.getBoundingClientRect();
+    if (dndState.currentY < scrollRect.top + 70) dndState.autoScrollDir = -1;
+    else if (dndState.currentY > scrollRect.bottom - 70) dndState.autoScrollDir = 1;
+    else dndState.autoScrollDir = 0;
+}
+
+function dragAutoScroll() {
+    if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) {
+        dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
+    }
+
+    if(dndState.clone) {
+        const cloneRect = dndState.clone.getBoundingClientRect();
+        const hitX = cloneRect.left + cloneRect.width / 2;
+        const hitY = cloneRect.top + cloneRect.height / 2;
+
+        dndState.clone.style.display = 'none';
+        const hitElement = document.elementFromPoint(hitX, hitY);
+        dndState.clone.style.display = 'flex';
+
+        let isHoveringFolder = false;
+
+        if (hitElement) {
+            // DETEKSI DROP KE FOLDER KHUSUS BOOKMARK DI ROOT VIEW
+            if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
+                const hitFolder = hitElement.closest('.folder-item');
+                if (hitFolder && hitFolder !== dndState.el) {
+                    isHoveringFolder = true;
+                    if (dndState.targetFolderEl !== hitFolder) {
+                        if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
+                        dndState.targetFolderEl = hitFolder;
+                        dndState.targetFolderId = hitFolder.dataset.id;
+                        hitFolder.classList.add('drag-over-folder');
+                        dndState.placeholder.style.display = 'none';
+                    }
+                }
+            }
+
+            // NORMAL REORDERING JIKA TIDAK HOVER FOLDER
+            if (!isHoveringFolder) {
+                if (dndState.targetFolderEl) {
+                    dndState.targetFolderEl.classList.remove('drag-over-folder');
+                    dndState.targetFolderEl = null;
+                    dndState.targetFolderId = null;
+                    dndState.placeholder.style.display = 'block';
+                }
+
+                const hitItem = hitElement.closest('.list-item:not(.dragging-clone)');
+                if (hitItem && hitItem.parentElement === dndState.listContainer) {
+                    const hitRect = hitItem.getBoundingClientRect();
+                    if (hitY < hitRect.top + hitRect.height / 2) {
+                        dndState.listContainer.insertBefore(dndState.placeholder, hitItem);
+                    } else {
+                        dndState.listContainer.insertBefore(dndState.placeholder, hitItem.nextSibling);
+                    }
+                }
+            }
+        }
+        dndState.rafId = requestAnimationFrame(dragAutoScroll);
     }
 }
 
-function promptDeleteFolder(id) {
-    showConfirm(t('delete_folder_title'), t('delete_folder_msg'), () => {
-        deleteFolder(id);
-    });
-}
+function onDragEnd(e) {
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('touchmove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+    document.removeEventListener('touchend', onDragEnd);
+    cancelAnimationFrame(dndState.rafId);
 
-function deleteFolder(id) {
-    const now = new Date().getTime();
-
-    appBookmarks.forEach(b => {
-        if (b.folderId === id) {
-            b.deleted = true;
-            b.timestamp = now;
-        }
-    });
-
-    const index = appFolders.findIndex(f => f.id === id);
-    if (index > -1) {
-        appFolders[index].deleted = true;
-        appFolders[index].timestamp = now;
+    if (dndState.targetFolderEl) {
+        dndState.targetFolderEl.classList.remove('drag-over-folder');
     }
 
-    saveBookmarks();
-    renderBookmarkTab();
-    showToast(t('folder_deleted'));
-}
+    // Eksekusi Logika Masukkan Bookmark ke Folder
+    if (dndState.targetFolderId && dndState.type === 'bookmark') {
+        const bm = appBookmarks.find(b => b.id === dndState.id);
+        if (bm) {
+            bm.folderId = dndState.targetFolderId;
+            bm.timestamp = new Date().getTime();
+            saveBookmarks();
+            renderBookmarkTab();
 
-function moveBookmark(id, dir) {
-    const bmIndex = appBookmarks.findIndex(b => b.id === id);
-    if (bmIndex === -1) return;
-    const bm = appBookmarks[bmIndex];
-    const folderId = bm.folderId;
-
-    let targetIndex = -1;
-    if (dir === -1) {
-        for (let i = bmIndex - 1; i >= 0; i--) {
-            if (appBookmarks[i].folderId === folderId && !appBookmarks[i].deleted) { targetIndex = i; break; }
+            const folderName = appFolders.find(f => f.id === dndState.targetFolderId)?.name || '';
+            showToast(`${t('bookmark_moved')} 📁 ${folderName}`);
         }
+
+        if (dndState.placeholder) dndState.placeholder.remove();
+        if (dndState.clone) dndState.clone.remove();
+        if (dndState.el) dndState.el.style.display = 'flex';
+
     } else {
-        for (let i = bmIndex + 1; i < appBookmarks.length; i++) {
-            if (appBookmarks[i].folderId === folderId && !appBookmarks[i].deleted) { targetIndex = i; break; }
+        // Eksekusi Logika Reorder (Ubah Urutan)
+        dndState.listContainer.insertBefore(dndState.el, dndState.placeholder);
+        dndState.el.style.display = 'flex';
+
+        const newOrderIds = Array.from(dndState.listContainer.querySelectorAll('.list-item'))
+            .map(el => el.dataset.id)
+            .filter(id => id);
+
+        if (dndState.placeholder) dndState.placeholder.remove();
+        if (dndState.clone) dndState.clone.remove();
+
+        let orderMap = new Map();
+        newOrderIds.forEach((id, idx) => orderMap.set(id, idx));
+
+        if (dndState.type === 'folder') {
+            appFolders.forEach((f, idx) => { f._originalIdx = idx; f._tempSort = orderMap.has(f.id) ? orderMap.get(f.id) : 99999; });
+            appFolders.sort((a, b) => a._tempSort !== b._tempSort ? a._tempSort - b._tempSort : a._originalIdx - b._originalIdx);
+            appFolders.forEach(f => { delete f._tempSort; delete f._originalIdx; });
+            const movedItem = appFolders.find(f => f.id === dndState.id);
+            if(movedItem) movedItem.timestamp = new Date().getTime();
+        } else {
+            appBookmarks.forEach((b, idx) => { b._originalIdx = idx; b._tempSort = orderMap.has(b.id) ? orderMap.get(b.id) : 99999; });
+            appBookmarks.sort((a, b) => a._tempSort !== b._tempSort ? a._tempSort - b._tempSort : a._originalIdx - b._originalIdx);
+            appBookmarks.forEach(b => { delete b._tempSort; delete b._originalIdx; });
+            const movedItem = appBookmarks.find(b => b.id === dndState.id);
+            if(movedItem) movedItem.timestamp = new Date().getTime();
         }
-    }
-
-    if (targetIndex !== -1) {
-        const temp = appBookmarks[bmIndex];
-        appBookmarks[bmIndex] = appBookmarks[targetIndex];
-        appBookmarks[targetIndex] = temp;
-
-        const now = new Date().getTime();
-        appBookmarks[bmIndex].timestamp = now;
-        appBookmarks[targetIndex].timestamp = now;
 
         saveBookmarks();
+
         if (currentViewingFolderId) {
             const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
             if (folder) openFolderView(folder.id, folder.name);
-            else closeFolderView();
         } else {
             renderBookmarkTab();
         }
     }
+
+    if (localStorage.getItem('quran_gdrive_linked') === 'true' && driveAccessToken) {
+        performSync(true);
+    }
+
+    dndState = {};
 }
+// =========================================
 
-// Icon disesuaikan menjadi 16x16
-const iconProps = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
-const svgUp = `<svg ${iconProps}><path d="M18 15l-6-6-6 6"/></svg>`;
-const svgDown = `<svg ${iconProps}><path d="M6 9l6 6 6-6"/></svg>`;
-const svgEdit = `<svg ${iconProps}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
-const svgTrash = `<svg ${iconProps}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
-const svgHistory = `<svg ${iconProps}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
-
-// Koleksi Warna dan Ikon Kustom Folder
 const folderColors = ['#0D9488', '#E11D48', '#D97706', '#16A34A', '#2563EB', '#9333EA'];
 const folderIcons = {
     'folder': `<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>`,
@@ -690,7 +798,7 @@ function renderBookmarkTab() {
 
     if (appLastRead && appLastRead.items && appLastRead.items.length > 0) {
         if (titleLastRead) titleLastRead.style.display = 'block';
-        let latest = appLastRead.items[0]; // Render item teratas di UI depan
+        let latest = appLastRead.items[0];
         lastReadContainer.innerHTML = `
             <div class="list-item" style="border-left: 4px solid var(--primary);" onclick="openQuranPage(${latest.pageNumber}, ${latest.surahId}, ${latest.verseId}, 'lastread')">
                 <div class="item-number" style="background:var(--primary-light); color:var(--primary);">
@@ -726,7 +834,7 @@ function renderBookmarkTab() {
         const iconSvg = getFolderSvg(folder.icon);
 
         folderHtml += `
-            <div class="list-item folder-item" onclick="openFolderView('${folder.id}', '${folder.name}')">
+            <div class="list-item folder-item" data-id="${folder.id}" onclick="openFolderView('${folder.id}', '${folder.name}')">
                 <div class="item-number" style="background:${color}; color:white;">
                    ${iconSvg}
                 </div>
@@ -735,8 +843,7 @@ function renderBookmarkTab() {
                     <div class="item-subtitle">${count} ${t('saved_ayah')}</div>
                 </div>
                 <div class="action-group">
-                    <button class="action-btn" onclick="event.stopPropagation(); moveFolder('${folder.id}', -1)">${svgUp}</button>
-                    <button class="action-btn" onclick="event.stopPropagation(); moveFolder('${folder.id}', 1)">${svgDown}</button>
+                    <button class="action-btn drag-handle" onmousedown="startDragItem(event, '${folder.id}', 'folder')" ontouchstart="startDragItem(event, '${folder.id}', 'folder')">${svgGrip}</button>
                     <button class="action-btn" onclick="event.stopPropagation(); openFolderModal('${folder.id}')" style="color:var(--primary);">${svgEdit}</button>
                     <button class="action-btn danger" onclick="event.stopPropagation(); promptDeleteFolder('${folder.id}')">${svgTrash}</button>
                 </div>
@@ -765,15 +872,14 @@ function renderBookmarkTab() {
     let bHtml = '';
     rootBookmarks.forEach(bm => {
         bHtml += `
-            <div class="list-item" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
+            <div class="list-item" data-id="${bm.id}" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
                 <div class="item-number" style="font-size: 0.7rem;">${t('page')}<br>${bm.pageNumber}</div>
                 <div class="item-info">
                     <div class="item-title">${bm.surahName}</div>
                     <div class="item-subtitle">${t('ayah')} ${bm.verseId}</div>
                 </div>
                 <div class="action-group">
-                    <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', -1)">${svgUp}</button>
-                    <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', 1)">${svgDown}</button>
+                    <button class="action-btn drag-handle" onmousedown="startDragItem(event, '${bm.id}', 'bookmark')" ontouchstart="startDragItem(event, '${bm.id}', 'bookmark')">${svgGrip}</button>
                     <button class="action-btn" onclick="event.stopPropagation(); openMoveModal('${bm.id}')">${getFolderSvg('folder')}</button>
                     <button class="action-btn danger" onclick="event.stopPropagation(); promptRemoveBookmark('${bm.id}')">${svgTrash}</button>
                 </div>
@@ -783,7 +889,6 @@ function renderBookmarkTab() {
     bookmarkList.innerHTML = bHtml;
 }
 
-// LOGIKA LAST READ HISTORY MODAL
 function openLastReadHistory() {
     const list = document.getElementById('last-read-history-list');
     if(!list) return;
@@ -809,7 +914,6 @@ function closeLastReadHistory() {
     document.getElementById('last-read-history-modal').classList.remove('active');
 }
 
-// LOGIKA EDIT FOLDER (NAMA, WARNA, IKON)
 let editingFolderId = null;
 let tempFolderColor = '#0D9488';
 let tempFolderIcon = 'folder';
@@ -885,7 +989,7 @@ function saveFolder() {
                 appFolders[index].timestamp = new Date().getTime();
             }
         } else {
-            appFolders.push({
+            appFolders.unshift({
                 id: 'f_' + new Date().getTime(),
                 name: name,
                 color: tempFolderColor,
@@ -896,7 +1000,6 @@ function saveFolder() {
         }
         saveBookmarks();
 
-        // Refresh UI
         if (currentViewingFolderId) {
             const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
             if (folder) openFolderView(folder.id, folder.name);
@@ -989,12 +1092,11 @@ function openFolderView(folderId, folderName) {
         }
 
         html += `
-            <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:10px; padding: 12px;" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
+            <div class="list-item" data-id="${bm.id}" style="flex-direction:column; align-items:flex-start; gap:10px; padding: 12px;" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
                 <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
                     <div style="font-weight:700; color:var(--primary); font-size:0.85rem;">${bm.surahName} : ${bm.verseId}</div>
                     <div class="action-group">
-                        <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', -1)">${svgUp}</button>
-                        <button class="action-btn" onclick="event.stopPropagation(); moveBookmark('${bm.id}', 1)">${svgDown}</button>
+                        <button class="action-btn drag-handle" onmousedown="startDragItem(event, '${bm.id}', 'bookmark')" ontouchstart="startDragItem(event, '${bm.id}', 'bookmark')">${svgGrip}</button>
                         <button class="action-btn" onclick="event.stopPropagation(); openMoveModal('${bm.id}')">${getFolderSvg('folder')}</button>
                         <button class="action-btn" onclick="event.stopPropagation(); openEditWordsModal('${bm.id}')" style="color:var(--primary);">${svgEdit}</button>
                         <button class="action-btn danger" onclick="event.stopPropagation(); promptRemoveBookmark('${bm.id}')">${svgTrash}</button>
