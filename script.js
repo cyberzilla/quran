@@ -453,16 +453,7 @@ function filterSurah() {
 }
 
 /* =========================================
-   CUSTOM DRAG AND DROP - FIXED
-   Bug fixes:
-   1. Ghost clone: touchstart + synthesized mousedown keduanya memanggil
-      startDragItem, timer lama tidak di-clear → dua clone sekaligus.
-   2. Lag: getBoundingClientRect() dipanggil di setiap frame RAF untuk
-      semua item → layout thrashing. Dipindah ke onDragMove + cache.
-   3. Duplicate event listeners: setiap touchstart+mousedown menambah
-      listener baru tanpa remove yang lama.
-   4. RAF loop ganda: executeDragStart kedua overwrite rafId tapi RAF
-      pertama tetap jalan.
+   CUSTOM DRAG AND DROP - ANTI BUG (AGGRESSIVE CLEANUP)
 ========================================= */
 const iconProps = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 const svgGrip = `<svg ${iconProps}><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line></svg>`;
@@ -471,12 +462,7 @@ const svgEdit = `<svg ${iconProps}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2
 const svgTrash = `<svg ${iconProps}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
 const svgHistory = `<svg ${iconProps}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
 
-let dndState = {
-    el: null, clone: null, placeholder: null, startY: 0, startTop: 0,
-    type: '', id: '', scrollContainer: null, autoScrollDir: 0, rafId: null,
-    listContainer: null, targetFolderId: null, targetFolderEl: null,
-    currentY: 0, cachedRects: null
-};
+let dndState = { el: null, clone: null, placeholder: null, startY: 0, startTop: 0, type: '', id: '', scrollContainer: null, autoScrollDir: 0, rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null };
 let dragContext = null;
 
 function cleanupDnd() {
@@ -484,43 +470,14 @@ function cleanupDnd() {
     document.querySelectorAll('.dragging-clone, .drag-placeholder').forEach(el => el.remove());
     document.querySelectorAll('.drag-over-folder').forEach(el => el.classList.remove('drag-over-folder'));
     if (dndState.el) dndState.el.style.display = '';
-    dndState = {
-        el: null, clone: null, placeholder: null, startY: 0, startTop: 0,
-        type: '', id: '', scrollContainer: null, autoScrollDir: 0, rafId: null,
-        listContainer: null, targetFolderId: null, targetFolderEl: null,
-        currentY: 0, cachedRects: null
-    };
-}
-
-// Cache posisi semua item SEKALI di awal drag, bukan setiap frame RAF.
-// Posisi hanya di-refresh saat terjadi auto-scroll (posisi berubah akibat scroll).
-function cacheItemRects() {
-    if (!dndState.listContainer) return;
-    dndState.cachedRects = Array.from(
-        dndState.listContainer.querySelectorAll('.list-item')
-    ).map(el => {
-        const r = el.getBoundingClientRect();
-        return { el, top: r.top, bottom: r.bottom, mid: r.top + r.height / 2 };
-    });
+    dndState = { el: null, clone: null, placeholder: null, startY: 0, startTop: 0, type: '', id: '', scrollContainer: null, autoScrollDir: 0, rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null };
 }
 
 window.startDragItem = function(e, id, type) {
     if (e.type === 'mousedown' && e.button !== 0) return;
-
-    // FIX BUG 1: Di mobile, touchstart + mousedown sintetis keduanya
-    // masuk ke sini. Jika dragContext sudah ada (dari touchstart),
-    // abaikan mousedown sintetis agar tidak membuat timer ganda.
-    if (e.type === 'mousedown' && dragContext) return;
-
     e.stopPropagation();
 
-    // FIX BUG 1 & 3: Selalu cancel timer lama dan hapus event listeners
-    // lama sebelum membuat konteks drag baru.
-    if (dragContext) {
-        clearTimeout(dragContext.timer);
-        cleanupDragEvents();
-        dragContext = null;
-    }
+    if (dragContext && dragContext.active) return;
     cleanupDnd();
 
     const btn = e.currentTarget;
@@ -531,14 +488,14 @@ window.startDragItem = function(e, id, type) {
     dragContext = { e, id, type, item, startY, startX, timer: null, active: false };
 
     dragContext.timer = setTimeout(() => {
-        if (!dragContext) return;
+        if(!dragContext) return;
         dragContext.active = true;
         if (navigator.vibrate) navigator.vibrate(40);
         executeDragStart(dragContext);
     }, 250);
 
-    document.addEventListener('mousemove', handleDragMoveInit, { passive: false });
-    document.addEventListener('touchmove', handleDragMoveInit, { passive: false });
+    document.addEventListener('mousemove', handleDragMoveInit, {passive: false});
+    document.addEventListener('touchmove', handleDragMoveInit, {passive: false});
     document.addEventListener('mouseup', cancelDragInit);
     document.addEventListener('touchend', cancelDragInit);
     document.addEventListener('touchcancel', cancelDragInit);
@@ -551,7 +508,6 @@ function handleDragMoveInit(e) {
     const currentX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
 
     if (!dragContext.active) {
-        // Jika pointer bergerak > 8px sebelum timer, batalkan drag (user scroll bukan drag)
         if (Math.abs(currentY - dragContext.startY) > 8 || Math.abs(currentX - dragContext.startX) > 8) cancelDragInit();
     } else {
         e.preventDefault();
@@ -562,33 +518,23 @@ function handleDragMoveInit(e) {
 function cancelDragInit() {
     if (dragContext && !dragContext.active) {
         clearTimeout(dragContext.timer); cleanupDragEvents(); dragContext = null;
-    } else if (dragContext && dragContext.active) {
-        onDragEnd();
-    }
+    } else if (dragContext && dragContext.active) onDragEnd();
 }
 
 function cleanupDragEvents() {
-    document.removeEventListener('mousemove', handleDragMoveInit);
-    document.removeEventListener('touchmove', handleDragMoveInit);
-    document.removeEventListener('mouseup', cancelDragInit);
-    document.removeEventListener('touchend', cancelDragInit);
-    document.removeEventListener('touchcancel', cancelDragInit);
-    window.removeEventListener('blur', cancelDragInit);
+    document.removeEventListener('mousemove', handleDragMoveInit); document.removeEventListener('touchmove', handleDragMoveInit);
+    document.removeEventListener('mouseup', cancelDragInit); document.removeEventListener('touchend', cancelDragInit);
+    document.removeEventListener('touchcancel', cancelDragInit); window.removeEventListener('blur', cancelDragInit);
 }
 
 function executeDragStart(ctx) {
     dndState.listContainer = ctx.item.parentElement;
     dndState.scrollContainer = document.querySelector('.tab-pane.active');
-    dndState.type = ctx.type;
-    dndState.id = ctx.id;
-    dndState.el = ctx.item;
-    dndState.currentY = ctx.startY;
+    dndState.type = ctx.type; dndState.id = ctx.id; dndState.el = ctx.item;
 
     const rect = ctx.item.getBoundingClientRect();
-    dndState.startY = ctx.startY;
-    dndState.startTop = rect.top;
+    dndState.startY = ctx.startY; dndState.startTop = rect.top;
 
-    // Buat clone visual
     dndState.clone = ctx.item.cloneNode(true);
     dndState.clone.classList.add('dragging-clone');
     dndState.clone.style.width = rect.width + 'px';
@@ -597,118 +543,85 @@ function executeDragStart(ctx) {
     dndState.clone.style.top = rect.top + 'px';
     document.body.appendChild(dndState.clone);
 
-    // Buat placeholder
     dndState.placeholder = document.createElement('div');
     dndState.placeholder.className = 'drag-placeholder';
     dndState.placeholder.style.height = rect.height + 'px';
+
     dndState.listContainer.insertBefore(dndState.placeholder, ctx.item);
     ctx.item.style.display = 'none';
 
-    // FIX BUG 2: Cache posisi semua item SEKALI di sini, bukan setiap frame RAF.
-    cacheItemRects();
-
-    // RAF hanya untuk auto-scroll, bukan untuk repositioning placeholder
     dndState.rafId = requestAnimationFrame(dragAutoScroll);
 }
 
 function onDragMove(currentY) {
-    if (!dndState.clone) return;
-
-    // Update posisi clone menggunakan transform untuk performa GPU lebih baik
     const deltaY = currentY - dndState.startY;
     dndState.clone.style.top = (dndState.startTop + deltaY) + 'px';
-    dndState.currentY = currentY;
 
-    // Hitung arah auto-scroll
     const scrollRect = dndState.scrollContainer.getBoundingClientRect();
     if (currentY < scrollRect.top + 70) dndState.autoScrollDir = -1;
     else if (currentY > scrollRect.bottom - 70) dndState.autoScrollDir = 1;
     else dndState.autoScrollDir = 0;
-
-    // FIX BUG 2: Repositioning placeholder dipindah ke sini (saat pointer
-    // bergerak), bukan di RAF loop. Ini menghilangkan getBoundingClientRect
-    // berulang setiap frame sehingga menghilangkan lag.
-    updatePlaceholderPosition();
-}
-
-function updatePlaceholderPosition() {
-    if (!dndState.clone || !dndState.cachedRects || !dndState.placeholder) return;
-
-    const cloneRect = dndState.clone.getBoundingClientRect();
-    const hitY = cloneRect.top + cloneRect.height / 2;
-
-    // Cek hover ke folder (hanya saat drag bookmark di root)
-    if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
-        let isHoveringFolder = false;
-        for (const cached of dndState.cachedRects) {
-            if (!cached.el.classList.contains('folder-item')) continue;
-            if (hitY >= cached.top && hitY <= cached.bottom) {
-                isHoveringFolder = true;
-                if (dndState.targetFolderEl !== cached.el) {
-                    if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
-                    dndState.targetFolderEl = cached.el;
-                    dndState.targetFolderId = cached.el.dataset.id;
-                    cached.el.classList.add('drag-over-folder');
-                    dndState.placeholder.style.display = 'none';
-                }
-                break;
-            }
-        }
-        if (!isHoveringFolder && dndState.targetFolderEl) {
-            dndState.targetFolderEl.classList.remove('drag-over-folder');
-            dndState.targetFolderEl = null;
-            dndState.targetFolderId = null;
-            dndState.placeholder.style.display = 'block';
-        }
-    }
-
-    // Posisikan placeholder di antara item sesuai posisi pointer
-    if (!dndState.targetFolderId) {
-        let inserted = false;
-        for (const cached of dndState.cachedRects) {
-            if (cached.el === dndState.el || cached.el === dndState.placeholder) continue;
-            if (hitY < cached.mid) {
-                dndState.listContainer.insertBefore(dndState.placeholder, cached.el);
-                inserted = true;
-                break;
-            }
-        }
-        if (!inserted) dndState.listContainer.appendChild(dndState.placeholder);
-    }
 }
 
 function dragAutoScroll() {
     if (!dndState.clone || !dndState.listContainer) { cleanupDnd(); return; }
 
-    // Auto-scroll: RAF hanya aktif untuk ini. Saat scroll terjadi,
-    // posisi item berubah → recache dan update placeholder.
-    if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) {
-        dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
-        // Posisi elemen berubah akibat scroll → refresh cache
-        cacheItemRects();
-        // Update placeholder dengan cache baru
-        updatePlaceholderPosition();
+    if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
+
+    const cloneRect = dndState.clone.getBoundingClientRect();
+    const hitY = cloneRect.top + cloneRect.height / 2;
+    let isHoveringFolder = false;
+
+    // Menghitung bounding box item secara matematis tanpa elementFromPoint
+    if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
+        const folders = Array.from(dndState.listContainer.querySelectorAll('.folder-item:not(.dragging-clone)'));
+        for (let folder of folders) {
+            const rect = folder.getBoundingClientRect();
+            if (hitY >= rect.top && hitY <= rect.bottom) {
+                isHoveringFolder = true;
+                if (dndState.targetFolderEl !== folder) {
+                    if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
+                    dndState.targetFolderEl = folder; dndState.targetFolderId = folder.dataset.id;
+                    folder.classList.add('drag-over-folder'); dndState.placeholder.style.display = 'none';
+                }
+                break;
+            }
+        }
     }
 
-    if (dndState.rafId) dndState.rafId = requestAnimationFrame(dragAutoScroll);
+    if (!isHoveringFolder) {
+        if (dndState.targetFolderEl) {
+            dndState.targetFolderEl.classList.remove('drag-over-folder');
+            dndState.targetFolderEl = null; dndState.targetFolderId = null;
+            dndState.placeholder.style.display = 'block';
+        }
+        const items = Array.from(dndState.listContainer.querySelectorAll('.list-item:not(.dragging-clone)'));
+        let inserted = false;
+        for (let item of items) {
+            const rect = item.getBoundingClientRect();
+            if (hitY < rect.top + rect.height / 2) {
+                dndState.listContainer.insertBefore(dndState.placeholder, item); inserted = true; break;
+            }
+        }
+        if (!inserted) dndState.listContainer.appendChild(dndState.placeholder);
+    }
+
+    if(dndState.rafId) dndState.rafId = requestAnimationFrame(dragAutoScroll);
 }
 
 function onDragEnd() {
-    cleanupDragEvents();
-    dragContext = null;
+    cleanupDragEvents(); dragContext = null;
     if (!dndState.clone || !dndState.listContainer) { cleanupDnd(); return; }
 
     if (dndState.targetFolderId && dndState.type === 'bookmark') {
         const bm = appBookmarks.find(b => b.id === dndState.id);
         if (bm) {
-            bm.folderId = dndState.targetFolderId;
-            bm.timestamp = new Date().getTime();
+            bm.folderId = dndState.targetFolderId; bm.timestamp = new Date().getTime();
             saveBookmarks();
             const folderName = appFolders.find(f => f.id === dndState.targetFolderId)?.name || '';
             showToast(`${t('bookmark_moved')} 📁 ${folderName}`);
         }
-        cleanupDnd();
-        renderBookmarkTab();
+        cleanupDnd(); renderBookmarkTab();
     } else {
         dndState.listContainer.insertBefore(dndState.el, dndState.placeholder);
         const elements = Array.from(dndState.listContainer.querySelectorAll('.list-item'));
@@ -716,11 +629,10 @@ function onDragEnd() {
             const id = el.dataset.id;
             if (id) {
                 let item = appFolders.find(f => f.id === id) || appBookmarks.find(b => b.id === id);
-                if (item && item.orderIndex !== index) { item.orderIndex = index; item.timestamp = new Date().getTime(); }
+                if(item && item.orderIndex !== index) { item.orderIndex = index; item.timestamp = new Date().getTime(); }
             }
         });
-        cleanupDnd();
-        saveBookmarks();
+        cleanupDnd(); saveBookmarks();
 
         if (currentViewingFolderId) {
             const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
