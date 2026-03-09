@@ -920,12 +920,9 @@
     }
 
     function cleanupDragEvents() {
-        document.removeEventListener('mousemove', handleDragMoveInit, {passive: false});
-        document.removeEventListener('touchmove', handleDragMoveInit, {passive: false});
-        document.removeEventListener('mouseup', cancelDragInit);
-        document.removeEventListener('touchend', cancelDragInit);
-        document.removeEventListener('touchcancel', cancelDragInit);
-        window.removeEventListener('blur', cancelDragInit);
+        document.removeEventListener('mousemove', handleDragMoveInit); document.removeEventListener('touchmove', handleDragMoveInit);
+        document.removeEventListener('mouseup', cancelDragInit); document.removeEventListener('touchend', cancelDragInit);
+        document.removeEventListener('touchcancel', cancelDragInit); window.removeEventListener('blur', cancelDragInit);
     }
 
     function executeDragStart(ctx) {
@@ -939,7 +936,6 @@
         ctx.item.style.transform = originalTransform; ctx.item.style.transition = originalTransition;
         dndState.startY = ctx.startY; dndState.startTop = rect.top;
         dndState.clone = ctx.item.cloneNode(true); dndState.clone.classList.add('dragging-clone');
-        dndState.clone.style.pointerEvents = 'none';
         dndState.clone.style.width = rect.width + 'px'; dndState.clone.style.height = rect.height + 'px';
         dndState.clone.style.left = rect.left + 'px'; dndState.clone.style.top = rect.top + 'px';
         document.body.appendChild(dndState.clone);
@@ -965,9 +961,9 @@
             const cloneRect = dndState.clone.getBoundingClientRect();
             const hitX = cloneRect.left + cloneRect.width / 2;
             const hitY = cloneRect.top + cloneRect.height / 2;
-            // dndState.clone.style.display = 'none';
+            dndState.clone.style.display = 'none';
             const hitElement = document.elementFromPoint(hitX, hitY);
-            // dndState.clone.style.display = 'flex';
+            dndState.clone.style.display = 'flex';
             let isHoveringFolder = false;
             if (hitElement) {
                 if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
