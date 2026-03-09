@@ -1,7 +1,7 @@
 /**
  * Al-Qur'an Digital App Script
  * Refactored: Modern, Clean, Reusable, & Encapsulated (IIFE)
- * Versi Final dengan Adopsi Algoritma getDragAfterElement & rAF Throttle
+ * Versi Final & Bug Fixes (Service Worker, Event Delegation, & Missing Exports)
  */
 (function (window, document) {
     'use strict';
@@ -11,7 +11,7 @@
     // =========================================
     let appSettings = {
         font: 'dkip', arabicSize: 1.85, wordByWord: false,
-        showTransliteration: false, showTranslation: true,
+        showTransliteration: false, showTranslation: false,
         appLanguage: 'id', timestamp: 0
     };
 
@@ -26,7 +26,6 @@
     let pwaTouchStartX = 0, pwaTouchStartY = 0;
     let dndState = { el: null, clone: null, placeholder: null, startY: 0, startTop: 0, type: '', id: '', scrollContainer: null, autoScrollDir: 0, rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null };
     let dragContext = null;
-    let dndTicking = false; // Flag untuk requestAnimationFrame (Diadopsi dari dnd.html)
 
     // State UI & Modal
     let keepTranslationExpanded = false;
@@ -555,6 +554,7 @@
         visibleFolders.forEach(folder => {
             const count = appBookmarks.filter(b => b.folderId === folder.id && !b.deleted).length;
             const color = folder.color || '#0D9488';
+            // Event delegation untuk drag-handle
             folderHtml += `
                 <div class="list-item folder-item" data-id="${folder.id}" onclick="openFolderView('${folder.id}', '${folder.name}')">
                     <div class="item-number" style="background:${color}; color:white;">${Utils.getFolderSvg(folder.icon)}</div>
@@ -868,7 +868,7 @@
     }
 
     // =========================================
-    // 10. DRAG AND DROP MODULE (ADOPSI LOGIKA DND.HTML)
+    // 10. DRAG AND DROP MODULE
     // =========================================
     function cleanupDnd() {
         $$('.dragging-clone, .drag-placeholder').forEach(el => el.remove());
@@ -878,22 +878,14 @@
         dndState = { el: null, clone: null, placeholder: null, startY: 0, startTop: 0, type: '', id: '', scrollContainer: null, autoScrollDir: 0, rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null };
     }
 
-    document.addEventListener('mousedown', (e) => {
-        const handle = e.target.closest('.drag-handle');
-        if (handle && e.button === 0) startDragItem(e, handle.dataset.id, handle.dataset.type, handle);
-    });
-
-    document.addEventListener('touchstart', (e) => {
-        const handle = e.target.closest('.drag-handle');
-        if (handle) startDragItem(e, handle.dataset.id, handle.dataset.type, handle);
-    }, { passive: true });
-
-    function startDragItem(e, id, type, handleEl) {
+    function startDragItem(e, id, type) {
+        if (e.type === 'mousedown' && e.button !== 0) return;
         cleanupDnd();
-        const item = handleEl.closest('.list-item');
-        const startYPos = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
-        const startXPos = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
-
+        const btn = e.target.closest('.drag-handle');
+        if (!btn) return;
+        const item = btn.closest('.list-item');
+        const startYPos = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+        const startXPos = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
         dragContext = { e, id, type, item, startY: startYPos, startX: startXPos, timer: null, active: false };
 
         dragContext.timer = setTimeout(() => {
@@ -913,41 +905,13 @@
 
     function handleDragMoveInit(e) {
         if (!dragContext) return;
-        const currentY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
-        const currentX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
-
+        const currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+        const currentX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
         if (!dragContext.active) {
             if (Math.abs(currentY - dragContext.startY) > 8 || Math.abs(currentX - dragContext.startX) > 8) cancelDragInit();
         } else {
-            if (e.cancelable) e.preventDefault();
-
-            // OPTIMASI: Menggunakan rAF Throttling layaknya di dnd.html
-            if (!dndTicking) {
-                window.requestAnimationFrame(() => {
-                    onDragMove(currentX, currentY);
-                    dndTicking = false;
-                });
-                dndTicking = true;
-            }
+            e.preventDefault(); onDragMove(currentY);
         }
-    }
-
-    // OPTIMASI: Fungsi penentu posisi dari elemen array layaknya di dnd.html
-    function getDragAfterElement(container, y, draggedEl) {
-        // Ambil elemen yang BUKAN kloningan, BUKAN placeholder, dan BUKAN elemen asli yang disembunyikan
-        const draggableElements = [...container.querySelectorAll('.list-item:not(.dragging-clone):not(.drag-placeholder)')]
-            .filter(el => el !== draggedEl && el.style.display !== 'none');
-
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
     function cancelDragInit() {
@@ -965,86 +929,70 @@
         dndState.listContainer = ctx.item.parentElement;
         dndState.scrollContainer = document.querySelector('.tab-pane.active');
         dndState.type = ctx.type; dndState.id = ctx.id; dndState.el = ctx.item;
-
         const originalTransform = ctx.item.style.transform;
         const originalTransition = ctx.item.style.transition;
         ctx.item.style.transition = 'none'; ctx.item.style.transform = 'none';
         const rect = ctx.item.getBoundingClientRect();
         ctx.item.style.transform = originalTransform; ctx.item.style.transition = originalTransition;
-
         dndState.startY = ctx.startY; dndState.startTop = rect.top;
-
-        dndState.clone = ctx.item.cloneNode(true);
-        dndState.clone.classList.add('dragging-clone');
-        dndState.clone.style.width = rect.width + 'px';
-        dndState.clone.style.height = rect.height + 'px';
-        dndState.clone.style.left = rect.left + 'px';
-        dndState.clone.style.top = rect.top + 'px';
-
-        dndState.clone.style.position = 'fixed';
-        dndState.clone.style.margin = '0';
-        dndState.clone.style.zIndex = '99999';
-        dndState.clone.style.boxSizing = 'border-box';
-        dndState.clone.style.pointerEvents = 'none';
-
+        dndState.clone = ctx.item.cloneNode(true); dndState.clone.classList.add('dragging-clone');
+        dndState.clone.style.width = rect.width + 'px'; dndState.clone.style.height = rect.height + 'px';
+        dndState.clone.style.left = rect.left + 'px'; dndState.clone.style.top = rect.top + 'px';
         document.body.appendChild(dndState.clone);
-
         dndState.placeholder = document.createElement('div'); dndState.placeholder.className = 'drag-placeholder';
         dndState.placeholder.style.height = rect.height + 'px'; dndState.placeholder.style.width = rect.width + 'px';
         dndState.listContainer.insertBefore(dndState.placeholder, ctx.item);
         ctx.item.style.display = 'none';
-
         dndState.rafId = requestAnimationFrame(dragAutoScroll);
     }
 
-    function onDragMove(currentX, currentY) {
+    function onDragMove(currentY) {
         const deltaY = currentY - dndState.startY;
         dndState.clone.style.top = (dndState.startTop + deltaY) + 'px';
-
         const scrollRect = dndState.scrollContainer.getBoundingClientRect();
         if (currentY < scrollRect.top + 70) dndState.autoScrollDir = -1;
         else if (currentY > scrollRect.bottom - 70) dndState.autoScrollDir = 1;
         else dndState.autoScrollDir = 0;
-
-        let isHoveringFolder = false;
-
-        // Tetap gunakan elementFromPoint KHUSUS untuk mendeteksi Drop ke Folder (bukan urutan)
-        if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
-            const hitElement = document.elementFromPoint(currentX, currentY);
-            if (hitElement) {
-                const hitFolder = hitElement.closest('.folder-item');
-                if (hitFolder && hitFolder !== dndState.el) {
-                    isHoveringFolder = true;
-                    if (dndState.targetFolderEl !== hitFolder) {
-                        if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
-                        dndState.targetFolderEl = hitFolder; dndState.targetFolderId = hitFolder.dataset.id;
-                        hitFolder.classList.add('drag-over-folder'); dndState.placeholder.style.display = 'none';
-                    }
-                }
-            }
-        }
-
-        if (!isHoveringFolder) {
-            if (dndState.targetFolderEl) {
-                dndState.targetFolderEl.classList.remove('drag-over-folder');
-                dndState.targetFolderEl = null; dndState.targetFolderId = null;
-                dndState.placeholder.style.display = 'block';
-            }
-
-            // OPTIMASI: Menggunakan algoritma pengurutan matematika getDragAfterElement dari dnd.html
-            const afterElement = getDragAfterElement(dndState.listContainer, currentY, dndState.el);
-
-            if (afterElement == null) {
-                dndState.listContainer.appendChild(dndState.placeholder);
-            } else {
-                dndState.listContainer.insertBefore(dndState.placeholder, afterElement);
-            }
-        }
     }
 
     function dragAutoScroll() {
         if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
-        dndState.rafId = requestAnimationFrame(dragAutoScroll);
+        if (dndState.clone) {
+            const cloneRect = dndState.clone.getBoundingClientRect();
+            const hitX = cloneRect.left + cloneRect.width / 2;
+            const hitY = cloneRect.top + cloneRect.height / 2;
+            dndState.clone.style.display = 'none';
+            const hitElement = document.elementFromPoint(hitX, hitY);
+            dndState.clone.style.display = 'flex';
+            let isHoveringFolder = false;
+            if (hitElement) {
+                if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
+                    const hitFolder = hitElement.closest('.folder-item');
+                    if (hitFolder && hitFolder !== dndState.el) {
+                        isHoveringFolder = true;
+                        if (dndState.targetFolderEl !== hitFolder) {
+                            if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
+                            dndState.targetFolderEl = hitFolder; dndState.targetFolderId = hitFolder.dataset.id;
+                            hitFolder.classList.add('drag-over-folder'); dndState.placeholder.style.display = 'none';
+                        }
+                    }
+                }
+                if (!isHoveringFolder) {
+                    if (dndState.targetFolderEl) {
+                        dndState.targetFolderEl.classList.remove('drag-over-folder');
+                        dndState.targetFolderEl = null; dndState.targetFolderId = null;
+                        dndState.placeholder.style.display = 'block';
+                    }
+                    const hitItem = hitElement.closest('.list-item:not(.dragging-clone)');
+                    if (hitItem && hitItem.parentElement === dndState.listContainer) {
+                        const hitRect = hitItem.getBoundingClientRect();
+                        if (hitY < hitRect.top + hitRect.height / 2) dndState.listContainer.insertBefore(dndState.placeholder, hitItem);
+                        else dndState.listContainer.insertBefore(dndState.placeholder, hitItem.nextSibling);
+                    }
+                }
+            }
+            dndState.rafId = requestAnimationFrame(dragAutoScroll);
+        }
     }
 
     function onDragEnd() {
@@ -1628,8 +1576,19 @@
     }
 
     // =========================================
-    // 14. PWA GESTURE PREVENTION FALLBACK
+    // 14. PWA GESTURE & GLOBAL EVENT DELEGATION
     // =========================================
+    // Delegasi Event Handle Drag (Tanpa memunculkan pesan peringatan di Chrome)
+    document.addEventListener('mousedown', (e) => {
+        const handle = e.target.closest('.drag-handle');
+        if (handle) startDragItem(e, handle.dataset.id, handle.dataset.type);
+    });
+
+    document.addEventListener('touchstart', (e) => {
+        const handle = e.target.closest('.drag-handle');
+        if (handle) startDragItem(e, handle.dataset.id, handle.dataset.type);
+    }, { passive: true });
+
     document.addEventListener('touchstart', e => { pwaTouchStartX = e.touches[0].clientX; pwaTouchStartY = e.touches[0].clientY; }, { passive: true });
     document.addEventListener('touchmove', e => {
         const diffX = e.touches[0].clientX - pwaTouchStartX; const diffY = e.touches[0].clientY - pwaTouchStartY;
@@ -1649,6 +1608,7 @@
     window.addEventListener('resize', () => { if ($('quran-view').classList.contains('active')) updateQuranUI(); });
     document.addEventListener('DOMContentLoaded', initApp);
 
+    // Registrasi Service Worker PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').catch(error => console.error('ServiceWorker failed:', error));
