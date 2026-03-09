@@ -867,9 +867,9 @@
         }, 10);
     }
 
-// =========================================
-// 10. DRAG AND DROP MODULE
-// =========================================
+    // =========================================
+    // 10. DRAG AND DROP MODULE
+    // =========================================
     function cleanupDnd() {
         $$('.dragging-clone, .drag-placeholder').forEach(el => el.remove());
         $$('.drag-over-folder').forEach(el => el.classList.remove('drag-over-folder'));
@@ -880,10 +880,6 @@
 
     function startDragItem(e, id, type) {
         if (e.type === 'mousedown' && e.button !== 0) return;
-
-        cleanupDragEvents();
-        if (dragContext?.timer) clearTimeout(dragContext.timer);
-
         cleanupDnd();
         const btn = e.target.closest('.drag-handle');
         if (!btn) return;
@@ -891,6 +887,7 @@
         const startYPos = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
         const startXPos = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
         dragContext = { e, id, type, item, startY: startYPos, startX: startXPos, timer: null, active: false };
+
         dragContext.timer = setTimeout(() => {
             if (!dragContext) return;
             dragContext.active = true;
@@ -929,31 +926,23 @@
     }
 
     function executeDragStart(ctx) {
-        // ✅ FIX LOGIC: Cancel RAF lama jika ada (Mencegah ghost loop)
-        if (dndState.rafId) cancelAnimationFrame(dndState.rafId);
-
         dndState.listContainer = ctx.item.parentElement;
         dndState.scrollContainer = document.querySelector('.tab-pane.active');
         dndState.type = ctx.type; dndState.id = ctx.id; dndState.el = ctx.item;
-
-        // ✅ POSISI VISUAL DIKEMBALIKAN PERSIS SEPERTI KODE ASLI
         const originalTransform = ctx.item.style.transform;
         const originalTransition = ctx.item.style.transition;
         ctx.item.style.transition = 'none'; ctx.item.style.transform = 'none';
         const rect = ctx.item.getBoundingClientRect();
         ctx.item.style.transform = originalTransform; ctx.item.style.transition = originalTransition;
-
         dndState.startY = ctx.startY; dndState.startTop = rect.top;
         dndState.clone = ctx.item.cloneNode(true); dndState.clone.classList.add('dragging-clone');
         dndState.clone.style.width = rect.width + 'px'; dndState.clone.style.height = rect.height + 'px';
         dndState.clone.style.left = rect.left + 'px'; dndState.clone.style.top = rect.top + 'px';
         document.body.appendChild(dndState.clone);
-
         dndState.placeholder = document.createElement('div'); dndState.placeholder.className = 'drag-placeholder';
         dndState.placeholder.style.height = rect.height + 'px'; dndState.placeholder.style.width = rect.width + 'px';
         dndState.listContainer.insertBefore(dndState.placeholder, ctx.item);
         ctx.item.style.display = 'none';
-
         dndState.rafId = requestAnimationFrame(dragAutoScroll);
     }
 
