@@ -867,26 +867,46 @@
         }, 10);
     }
 
-    // =========================================
-    // 10. DRAG AND DROP MODULE
-    // =========================================
+// =========================================
+// 10. DRAG AND DROP MODULE (FIXED)
+// =========================================
     function cleanupDnd() {
-        $$('.dragging-clone, .drag-placeholder').forEach(el => el.remove());
-        $$('.drag-over-folder').forEach(el => el.classList.remove('drag-over-folder'));
+        $$('.dragging-clone, .drag-placeholder').forEach(el => el?.remove());
+        $$('.drag-over-folder').forEach(el => el?.classList.remove('drag-over-folder'));
         if (dndState.el) dndState.el.style.display = 'flex';
-        cancelAnimationFrame(dndState.rafId);
-        dndState = { el: null, clone: null, placeholder: null, startY: 0, startTop: 0, type: '', id: '', scrollContainer: null, autoScrollDir: 0, rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null };
+        if (dndState.rafId) cancelAnimationFrame(dndState.rafId);
+        dndState = { el: null, clone: null, placeholder: null, startY: 0, startTop: 0,
+            type: '', id: '', scrollContainer: null, autoScrollDir: 0,
+            rafId: null, listContainer: null, targetFolderId: null,
+            targetFolderEl: null };
+    }
+
+    function cleanupDragEvents() {
+        document.removeEventListener('mousemove', handleDragMoveInit);
+        document.removeEventListener('touchmove', handleDragMoveInit);
+        document.removeEventListener('mouseup', cancelDragInit);
+        document.removeEventListener('touchend', cancelDragInit);
+        document.removeEventListener('touchcancel', cancelDragInit);
+        window.removeEventListener('blur', cancelDragInit);
     }
 
     function startDragItem(e, id, type) {
         if (e.type === 'mousedown' && e.button !== 0) return;
+
+        // ❗ PENTING: Cleanup dulu sebelum mulai drag baru
+        cleanupDragEvents();
         cleanupDnd();
+        if (dragContext?.timer) clearTimeout(dragContext.timer);
+
         const btn = e.target.closest('.drag-handle');
         if (!btn) return;
+
         const item = btn.closest('.list-item');
         const startYPos = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
         const startXPos = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
-        dragContext = { e, id, type, item, startY: startYPos, startX: startXPos, timer: null, active: false };
+
+        dragContext = { e, id, type, item, startY: startYPos, startX: startXPos,
+            timer: null, active: false };
 
         dragContext.timer = setTimeout(() => {
             if (!dragContext) return;
@@ -907,48 +927,66 @@
         if (!dragContext) return;
         const currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
         const currentX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
+
         if (!dragContext.active) {
-            if (Math.abs(currentY - dragContext.startY) > 8 || Math.abs(currentX - dragContext.startX) > 8) cancelDragInit();
+            if (Math.abs(currentY - dragContext.startY) > 8 ||
+                Math.abs(currentX - dragContext.startX) > 8) {
+                clearTimeout(dragContext.timer);
+                cleanupDragEvents();
+                dragContext = null;
+            }
         } else {
-            e.preventDefault(); onDragMove(currentY);
+            e.preventDefault();
+            onDragMove(currentY);
         }
     }
 
     function cancelDragInit() {
-        if (dragContext && !dragContext.active) { clearTimeout(dragContext.timer); cleanupDragEvents(); dragContext = null; }
-        else if (dragContext && dragContext.active) onDragEnd();
-    }
-
-    function cleanupDragEvents() {
-        document.removeEventListener('mousemove', handleDragMoveInit); document.removeEventListener('touchmove', handleDragMoveInit);
-        document.removeEventListener('mouseup', cancelDragInit); document.removeEventListener('touchend', cancelDragInit);
-        document.removeEventListener('touchcancel', cancelDragInit); window.removeEventListener('blur', cancelDragInit);
+        if (dragContext && !dragContext.active) {
+            clearTimeout(dragContext.timer);
+            cleanupDragEvents();
+            dragContext = null;
+        } else if (dragContext && dragContext.active) {
+            onDragEnd();
+        }
     }
 
     function executeDragStart(ctx) {
         dndState.listContainer = ctx.item.parentElement;
         dndState.scrollContainer = document.querySelector('.tab-pane.active');
-        dndState.type = ctx.type; dndState.id = ctx.id; dndState.el = ctx.item;
-        const originalTransform = ctx.item.style.transform;
-        const originalTransition = ctx.item.style.transition;
-        ctx.item.style.transition = 'none'; ctx.item.style.transform = 'none';
+        dndState.type = ctx.type;
+        dndState.id = ctx.id;
+        dndState.el = ctx.item;
+
         const rect = ctx.item.getBoundingClientRect();
-        ctx.item.style.transform = originalTransform; ctx.item.style.transition = originalTransition;
-        dndState.startY = ctx.startY; dndState.startTop = rect.top;
-        dndState.clone = ctx.item.cloneNode(true); dndState.clone.classList.add('dragging-clone');
-        dndState.clone.style.width = rect.width + 'px'; dndState.clone.style.height = rect.height + 'px';
-        dndState.clone.style.left = rect.left + 'px'; dndState.clone.style.top = rect.top + 'px';
+        dndState.startY = ctx.startY;
+        dndState.startTop = rect.top;
+
+        dndState.clone = ctx.item.cloneNode(true);
+        dndState.clone.classList.add('dragging-clone');
+        dndState.clone.style.width = rect.width + 'px';
+        dndState.clone.style.height = rect.height + 'px';
+        dndState.clone.style.left = rect.left + 'px';
+        dndState.clone.style.top = rect.top + 'px';
         document.body.appendChild(dndState.clone);
-        dndState.placeholder = document.createElement('div'); dndState.placeholder.className = 'drag-placeholder';
-        dndState.placeholder.style.height = rect.height + 'px'; dndState.placeholder.style.width = rect.width + 'px';
+
+        dndState.placeholder = document.createElement('div');
+        dndState.placeholder.className = 'drag-placeholder';
+        dndState.placeholder.style.height = rect.height + 'px';
+        dndState.placeholder.style.width = rect.width + 'px';
         dndState.listContainer.insertBefore(dndState.placeholder, ctx.item);
+
         ctx.item.style.display = 'none';
+
+        // ❗ Pastikan RAF sebelumnya di-cancel
+        if (dndState.rafId) cancelAnimationFrame(dndState.rafId);
         dndState.rafId = requestAnimationFrame(dragAutoScroll);
     }
 
     function onDragMove(currentY) {
         const deltaY = currentY - dndState.startY;
         dndState.clone.style.top = (dndState.startTop + deltaY) + 'px';
+
         const scrollRect = dndState.scrollContainer.getBoundingClientRect();
         if (currentY < scrollRect.top + 70) dndState.autoScrollDir = -1;
         else if (currentY > scrollRect.bottom - 70) dndState.autoScrollDir = 1;
@@ -956,14 +994,19 @@
     }
 
     function dragAutoScroll() {
-        if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
+        if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) {
+            dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
+        }
+
         if (dndState.clone) {
             const cloneRect = dndState.clone.getBoundingClientRect();
             const hitX = cloneRect.left + cloneRect.width / 2;
             const hitY = cloneRect.top + cloneRect.height / 2;
+
             dndState.clone.style.display = 'none';
             const hitElement = document.elementFromPoint(hitX, hitY);
             dndState.clone.style.display = 'flex';
+
             let isHoveringFolder = false;
             if (hitElement) {
                 if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
@@ -971,23 +1014,33 @@
                     if (hitFolder && hitFolder !== dndState.el) {
                         isHoveringFolder = true;
                         if (dndState.targetFolderEl !== hitFolder) {
-                            if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
-                            dndState.targetFolderEl = hitFolder; dndState.targetFolderId = hitFolder.dataset.id;
-                            hitFolder.classList.add('drag-over-folder'); dndState.placeholder.style.display = 'none';
+                            if (dndState.targetFolderEl) {
+                                dndState.targetFolderEl.classList.remove('drag-over-folder');
+                            }
+                            dndState.targetFolderEl = hitFolder;
+                            dndState.targetFolderId = hitFolder.dataset.id;
+                            hitFolder.classList.add('drag-over-folder');
+                            dndState.placeholder.style.display = 'none';
                         }
                     }
                 }
+
                 if (!isHoveringFolder) {
                     if (dndState.targetFolderEl) {
                         dndState.targetFolderEl.classList.remove('drag-over-folder');
-                        dndState.targetFolderEl = null; dndState.targetFolderId = null;
+                        dndState.targetFolderEl = null;
+                        dndState.targetFolderId = null;
                         dndState.placeholder.style.display = 'block';
                     }
+
                     const hitItem = hitElement.closest('.list-item:not(.dragging-clone)');
                     if (hitItem && hitItem.parentElement === dndState.listContainer) {
                         const hitRect = hitItem.getBoundingClientRect();
-                        if (hitY < hitRect.top + hitRect.height / 2) dndState.listContainer.insertBefore(dndState.placeholder, hitItem);
-                        else dndState.listContainer.insertBefore(dndState.placeholder, hitItem.nextSibling);
+                        if (hitY < hitRect.top + hitRect.height / 2) {
+                            dndState.listContainer.insertBefore(dndState.placeholder, hitItem);
+                        } else {
+                            dndState.listContainer.insertBefore(dndState.placeholder, hitItem.nextSibling);
+                        }
                     }
                 }
             }
@@ -996,16 +1049,32 @@
     }
 
     function onDragEnd() {
-        cleanupDragEvents(); dragContext = null;
-        if (!dndState.clone) { cleanupDnd(); return; }
+        // ❗ PENTING: Cleanup event listener di sini!
+        cleanupDragEvents();
+
+        if (dndState.rafId) {
+            cancelAnimationFrame(dndState.rafId);
+            dndState.rafId = null;
+        }
+
+        dragContext = null;
+
+        if (!dndState.clone) {
+            cleanupDnd();
+            return;
+        }
+
         if (dndState.targetFolderId && dndState.type === 'bookmark') {
             const bm = appBookmarks.find(b => b.id === dndState.id);
             if (bm) {
-                bm.folderId = dndState.targetFolderId; bm.timestamp = Date.now(); saveBookmarks();
+                bm.folderId = dndState.targetFolderId;
+                bm.timestamp = Date.now();
+                saveBookmarks();
                 const folderName = appFolders.find(f => f.id === dndState.targetFolderId)?.name || '';
                 showToast(`${t('bookmark_moved')} 📁 ${folderName}`);
             }
-            cleanupDnd(); renderBookmarkTab();
+            cleanupDnd();
+            renderBookmarkTab();
         } else {
             dndState.listContainer.insertBefore(dndState.el, dndState.placeholder);
             const elements = Array.from(dndState.listContainer.querySelectorAll('.list-item'));
@@ -1013,16 +1082,25 @@
                 const id = el.dataset.id;
                 if (id) {
                     let item = appFolders.find(f => f.id === id) || appBookmarks.find(b => b.id === id);
-                    if (item && item.orderIndex !== index) { item.orderIndex = index; item.timestamp = Date.now(); }
+                    if (item && item.orderIndex !== index) {
+                        item.orderIndex = index;
+                        item.timestamp = Date.now();
+                    }
                 }
             });
-            cleanupDnd(); saveBookmarks();
+            cleanupDnd();
+            saveBookmarks();
             if (currentViewingFolderId) {
                 const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
                 if (folder) openFolderView(folder.id, folder.name);
-            } else { renderBookmarkTab(); }
+            } else {
+                renderBookmarkTab();
+            }
         }
-        if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) performSync(true);
+
+        if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
+            performSync(true);
+        }
     }
 
     // =========================================
