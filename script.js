@@ -1,7 +1,7 @@
 /**
  * Al-Qur'an Digital App Script
  * Refactored: Modern, Clean, Reusable, & Encapsulated (IIFE)
- * Dengan tambahan fitur Fullscreen dan Wake Lock
+ * Fitur: Fullscreen, Wake Lock, Juz Limit 2 Kata, Info Juz Terlokalisasi, Integrasi name_en untuk Surah
  */
 (function (window, document) {
     'use strict';
@@ -15,7 +15,7 @@
         wordByWord: false,
         showTransliteration: false,
         showTranslation: false,
-        keepScreenOn: false, // Menambahkan state Keep Screen On
+        keepScreenOn: false,
         appLanguage: 'id',
         timestamp: 0
     };
@@ -36,10 +36,10 @@
     let preventNextClick = false;
     let pwaTouchStartX = 0;
     let pwaTouchStartY = 0;
-    let dndState = { 
-        el: null, clone: null, placeholder: null, startY: 0, startTop: 0, 
-        type: '', id: '', scrollContainer: null, autoScrollDir: 0, 
-        rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null 
+    let dndState = {
+        el: null, clone: null, placeholder: null, startY: 0, startTop: 0,
+        type: '', id: '', scrollContainer: null, autoScrollDir: 0,
+        rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null
     };
     let dragContext = null;
 
@@ -106,7 +106,8 @@
             logout_prompt_title: "Keluar Akun", logout_prompt_msg: "Apakah Anda yakin ingin memutuskan sinkronisasi Google Drive?",
             logout: "Keluar", import_success: "Data berhasil diimpor!", import_failed: "Format file impor tidak valid.",
             empty_folder_name: "Nama folder tidak boleh kosong!",
-            keep_screen_on: "Layar Tetap Menyala", fullscreen_mode: "Mode Layar Penuh"
+            keep_screen_on: "Layar Tetap Menyala", fullscreen_mode: "Mode Layar Penuh",
+            rem_pages: "Sisa {n} hal ke Juz {j}", start_juz: "Awal Juz {j}", last_juz: "Juz Terakhir"
         },
         en: {
             tab_surah: "Surah", tab_juz: "Juz", tab_library: "Library",
@@ -143,7 +144,8 @@
             logout_prompt_title: "Sign Out", logout_prompt_msg: "Are you sure you want to disconnect Google Drive synchronization?",
             logout: "Sign Out", import_success: "Data imported successfully!", import_failed: "Invalid import file format.",
             empty_folder_name: "Folder name cannot be empty!",
-            keep_screen_on: "Keep Screen On", fullscreen_mode: "Fullscreen Mode"
+            keep_screen_on: "Keep Screen On", fullscreen_mode: "Fullscreen Mode",
+            rem_pages: "{n} pages to Juz {j}", start_juz: "Start of Juz {j}", last_juz: "Last Juz"
         }
     };
 
@@ -167,10 +169,10 @@
 
     const Storage = {
         getJson: (key, defaultValue) => {
-            try { 
-                return JSON.parse(localStorage.getItem(key)) || defaultValue; 
-            } catch (e) { 
-                return defaultValue; 
+            try {
+                return JSON.parse(localStorage.getItem(key)) || defaultValue;
+            } catch (e) {
+                return defaultValue;
             }
         },
         setJson: (key, value) => localStorage.setItem(key, JSON.stringify(value)),
@@ -184,19 +186,19 @@
             if (!timestamp) return '';
             const seconds = Math.floor((Date.now() - timestamp) / 1000);
             if (seconds < 60) return t('just_now');
-            
+
             const minutes = Math.floor(seconds / 60);
             if (minutes < 60) return `${minutes} ${t('min_ago')}`;
-            
+
             const hours = Math.floor(minutes / 60);
             if (hours < 24) return `${hours} ${t('hour_ago')}`;
-            
+
             const days = Math.floor(hours / 24);
             if (days < 30) return `${days} ${t('day_ago')}`;
-            
+
             const months = Math.floor(days / 30);
             if (months < 12) return `${months} ${t('month_ago')}`;
-            
+
             const years = Math.floor(days / 365);
             return `${years} ${t('year_ago')}`;
         },
@@ -204,7 +206,7 @@
             if (!text) return "";
             let result = "";
             let depth = 0;
-            
+
             for (let char of text) {
                 if (char === '[') {
                     depth++;
@@ -216,9 +218,9 @@
                     result += char;
                 }
             }
-            while (depth > 0) { 
-                result += `</span>`; 
-                depth--; 
+            while (depth > 0) {
+                result += `</span>`;
+                depth--;
             }
             return result;
         },
@@ -244,10 +246,10 @@
     function showToast(message) {
         const toast = $('toast');
         if (!toast) return;
-        
+
         toast.innerHTML = `<div class="toast-inner">${message}</div>`;
         toast.classList.add('show');
-        
+
         if (toastTimeout) clearTimeout(toastTimeout);
         toastTimeout = setTimeout(() => toast.classList.remove('show'), 2500);
     }
@@ -255,10 +257,10 @@
     function showConfirm(title, message, callback, dangerBtnText) {
         $('confirm-title').innerText = title;
         $('confirm-message').innerText = message;
-        
+
         const primaryBtn = document.querySelector('#confirm-modal .btn-primary');
         if (primaryBtn) primaryBtn.innerText = dangerBtnText || t('delete');
-        
+
         confirmCallback = callback;
         $('confirm-modal').classList.add('active');
     }
@@ -328,7 +330,6 @@
         }
     }
 
-    // Menangani perubahan visibilitas browser (untuk mengaktifkan kembali Wake Lock jika kembali ke tab)
     document.addEventListener('visibilitychange', async () => {
         if (wakeLock !== null && document.visibilityState === 'visible' && appSettings.keepScreenOn) {
             requestWakeLock();
@@ -350,7 +351,6 @@
         }
     }
 
-    // Mendengarkan perubahan fullscreen untuk menyelaraskan status pada menu Pengaturan UI
     document.addEventListener('fullscreenchange', () => {
         const fsToggle = $('toggle-fullscreen');
         if (fsToggle) {
@@ -365,7 +365,7 @@
         appBookmarks = Storage.getJson('quran_bookmarks', []);
         appFolders = Storage.getJson('quran_folders', []);
         let savedLR = Storage.getJson('quran_last_read', null);
-        
+
         if (savedLR) {
             if (Array.isArray(savedLR?.items)) {
                 appLastRead = savedLR;
@@ -390,17 +390,17 @@
         try {
             const result = db.exec(sqlQuery);
             if (result.length === 0) return [];
-            
+
             const columns = result[0].columns;
             const rows = result[0].values;
-            
+
             return rows.map(row => {
                 let obj = {};
                 columns.forEach((col, index) => obj[col] = row[index]);
                 return obj;
             });
-        } catch (e) { 
-            return []; 
+        } catch (e) {
+            return [];
         }
     }
 
@@ -420,9 +420,9 @@
             if (loaderText) loaderText.innerText = t('loading_assets');
             try {
                 await Promise.all([
-                    document.fonts.load("12px dkip"), 
+                    document.fonts.load("12px dkip"),
                     document.fonts.load("12px juz"),
-                    document.fonts.load("12px short"), 
+                    document.fonts.load("12px short"),
                     document.fonts.load("12px long")
                 ]);
             } catch (e) {}
@@ -438,7 +438,7 @@
             const ds = new DecompressionStream('gzip');
             const decompressedStream = response.body.pipeThrough(ds);
             const buffer = await new Response(decompressedStream).arrayBuffer();
-            
+
             db = new SQL.Database(new Uint8Array(buffer));
 
             if (!isDbDownloaded) Storage.setString('is_db_downloaded', 'true');
@@ -451,7 +451,7 @@
 
             const isReading = Storage.getString('quran_is_reading');
             const lastPage = Storage.getString('quran_last_page');
-            
+
             if (isReading === 'true' && lastPage) {
                 openQuranPage(parseInt(lastPage, 10));
             }
@@ -460,9 +460,9 @@
             console.error("Error App:", error);
             if (loaderText) loaderText.innerText = t('db_failed');
         } finally {
-            setTimeout(() => { 
-                const loader = $('global-loader'); 
-                if (loader) loader.classList.add('hidden'); 
+            setTimeout(() => {
+                const loader = $('global-loader');
+                if (loader) loader.classList.add('hidden');
             }, 500);
         }
     }
@@ -471,7 +471,7 @@
         currentActiveTab = index;
         const indicator = $('main-tab-indicator');
         if (indicator) indicator.style.transform = `translateX(${index * 100}%)`;
-        
+
         $$('.tab-pane').forEach((pane, idx) => pane.classList.toggle('active', idx === index));
         $$('.quran-tab').forEach((btn, idx) => btn.classList.toggle('active', idx === index));
     }
@@ -479,7 +479,7 @@
     function setupSwipeTabs() {
         const swipeArea = $('main-tab-swipe-area');
         if (!swipeArea) return;
-        
+
         let touchStartX = 0;
         let touchStartY = 0;
 
@@ -491,7 +491,7 @@
         swipeArea.addEventListener('touchmove', e => {
             let diffX = e.changedTouches[0].clientX - touchStartX;
             let diffY = e.changedTouches[0].clientY - touchStartY;
-            
+
             if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 5 && e.cancelable) {
                 e.preventDefault();
             }
@@ -500,7 +500,7 @@
         swipeArea.addEventListener('touchend', e => {
             let diffX = e.changedTouches[0].clientX - touchStartX;
             let diffY = e.changedTouches[0].clientY - touchStartY;
-            
+
             if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
                 if (diffX < 0 && currentActiveTab < 2) switchMainTab(currentActiveTab + 1);
                 else if (diffX > 0 && currentActiveTab > 0) switchMainTab(currentActiveTab - 1);
@@ -514,18 +514,18 @@
     function renderSurahList() {
         const container = $('surah-list');
         if (!container) return;
-        
+
         const surahData = execQuery("SELECT * FROM surah ORDER BY id ASC");
         let html = '';
 
         surahData.forEach(surah => {
             const pageQuery = execQuery(`SELECT page_number FROM verses WHERE surah_number = ${surah.id} LIMIT 1`);
             const startPage = pageQuery.length > 0 ? pageQuery[0].page_number : 1;
-            const surahSubtitle = appSettings.appLanguage === 'en' ? surah.name_latin : surah.name_id;
+            const surahSubtitle = appSettings.appLanguage === 'en' ? (surah.name_en || surah.name_latin) : (surah.name_id || surah.name_latin);
 
             html += `
                 <div class="list-item surah-item" onclick="openQuranPage(${startPage})" 
-                     data-id="${surah.id}" data-name="${surah.name_latin}" data-nameid="${surah.name_id || ''}" data-namear="${surah.name_ar}">
+                     data-id="${surah.id}" data-name="${surah.name_latin}" data-nameid="${surah.name_id || ''}" data-nameen="${surah.name_en || ''}" data-namear="${surah.name_ar}">
                     <div class="item-number">${surah.id}</div>
                     <div class="item-info">
                         <div class="item-title">${surah.name_latin}</div>
@@ -535,20 +535,21 @@
                 </div>
             `;
         });
-        
+
         container.innerHTML = html;
     }
 
     function filterSurah() {
         const rawKeyword = $('search-surah').value;
         const keyword = Utils.normalizeText(rawKeyword);
-        
+
         $$('.surah-item').forEach(item => {
             const id = item.getAttribute('data-id');
             const name = Utils.normalizeText(item.getAttribute('data-name'));
             const nameid = Utils.normalizeText(item.getAttribute('data-nameid'));
-            
-            const isMatch = id.includes(rawKeyword) || name.includes(keyword) || nameid.includes(keyword);
+            const nameen = Utils.normalizeText(item.getAttribute('data-nameen'));
+
+            const isMatch = id.includes(rawKeyword) || name.includes(keyword) || nameid.includes(keyword) || nameen.includes(keyword);
             item.style.display = isMatch ? 'flex' : 'none';
         });
     }
@@ -556,24 +557,38 @@
     function renderJuzList() {
         const container = $('juz-list');
         if (!container) return;
-        
+
         let html = '';
         for (let i = 1; i <= 30; i++) {
             const juzQuery = execQuery(`
-                SELECT v.page_number, v.surah_number, v.verse_number, s.name_latin
+                SELECT v.page_number, v.surah_number, v.verse_number, v.arabic_words, v.arabic_text, s.name_latin
                 FROM verses v LEFT JOIN surah s ON v.surah_number = s.id WHERE v.juz_number = ${i} ORDER BY v.id ASC LIMIT 1
             `);
-            
-            let startPage = 1, surahName = "", verseNumber = 1;
-            
+
+            let startPage = 1, surahName = "", verseNumber = 1, firstAyahText = "";
+
             if (juzQuery.length > 0) {
                 startPage = juzQuery[0].page_number;
                 surahName = juzQuery[0].name_latin;
                 verseNumber = juzQuery[0].verse_number;
+
+                const isNotNumberOrMarker = (word) => !word.match(/[\d\u0660-\u0669\u06F0-\u06F9\u06DD]/);
+
+                let words = [];
+                try {
+                    words = JSON.parse(juzQuery[0].arabic_words || "[]");
+                } catch (e) {}
+
+                if (words.length > 0) {
+                    firstAyahText = words.filter(isNotNumberOrMarker).slice(0, 2).join(' ') + ' ...';
+                } else {
+                    words = (juzQuery[0].arabic_text || "").split(' ');
+                    firstAyahText = words.filter(isNotNumberOrMarker).slice(0, 2).join(' ') + ' ...';
+                }
             }
-            
+
             let paddedJuz = String(i).padStart(3, '0');
-            
+
             html += `
                 <div class="list-item" onclick="openQuranPage(${startPage})">
                     <div class="item-number">${t('juz')}<br>${i}</div>
@@ -581,7 +596,9 @@
                         <div class="juz-title item-title">juz${paddedJuz}</div>
                         <div class="item-subtitle">${surahName} • ${t('ayah')} ${verseNumber}</div>
                     </div>
-                    <div class="first_ayah">j${paddedJuz}</div>
+                    <div style="font-family: 'dkip', serif; font-size: 1.1rem; color: var(--primary); text-align: right; direction: rtl; flex-shrink: 0; line-height: 1.4; padding-left: 10px;">
+                        ${firstAyahText}
+                    </div>
                 </div>
             `;
         }
@@ -593,29 +610,29 @@
     // =========================================
     function addBookmark() {
         if (!activeVerseData) return;
-        
+
         appBookmarks.unshift({
             id: `bm_${Date.now()}_${Math.floor(Math.random()*1000)}`,
-            surahId: activeVerseData.surahId, 
+            surahId: activeVerseData.surahId,
             verseId: activeVerseData.verseId,
-            pageNumber: activeVerseData.pageNumber, 
+            pageNumber: activeVerseData.pageNumber,
             surahName: activeVerseData.surahName,
             folderId: currentViewingFolderId || null,
-            orderIndex: -Date.now(), 
-            timestamp: Date.now(), 
-            deleted: false, 
+            orderIndex: -Date.now(),
+            timestamp: Date.now(),
+            deleted: false,
             hiddenWords: []
         });
-        
+
         saveBookmarks();
-        
+
         if (currentViewingFolderId) {
             const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
             if (folder) openFolderView(folder.id, folder.name);
-        } else { 
-            renderBookmarkTab(); 
+        } else {
+            renderBookmarkTab();
         }
-        
+
         showToast(t('bookmark_added'));
         closeVersePopup();
         $$('.highlighted').forEach(el => el.classList.remove('highlighted'));
@@ -623,84 +640,84 @@
 
     function removeBookmark(id) {
         const index = appBookmarks.findIndex(b => b.id === id);
-        
-        if (index > -1) { 
-            appBookmarks[index].deleted = true; 
-            appBookmarks[index].timestamp = Date.now(); 
+
+        if (index > -1) {
+            appBookmarks[index].deleted = true;
+            appBookmarks[index].timestamp = Date.now();
         }
-        
+
         saveBookmarks();
-        
+
         if (currentViewingFolderId) {
             const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
-            if (folder) openFolderView(folder.id, folder.name); 
+            if (folder) openFolderView(folder.id, folder.name);
             else closeFolderView();
-        } else { 
-            renderBookmarkTab(); 
+        } else {
+            renderBookmarkTab();
         }
-        
+
         showToast(t('bookmark_removed'));
     }
 
-    function promptRemoveBookmark(id) { 
-        showConfirm(t('delete_bookmark_title'), t('delete_bookmark_msg'), () => removeBookmark(id)); 
+    function promptRemoveBookmark(id) {
+        showConfirm(t('delete_bookmark_title'), t('delete_bookmark_msg'), () => removeBookmark(id));
     }
 
     function deleteFolder(id) {
         const now = Date.now();
         const index = appFolders.findIndex(f => f.id === id);
-        
-        if (index > -1) { 
-            appFolders[index].deleted = true; 
-            appFolders[index].timestamp = now; 
+
+        if (index > -1) {
+            appFolders[index].deleted = true;
+            appFolders[index].timestamp = now;
         }
-        
-        appBookmarks.forEach(b => { 
-            if (b.folderId === id) { 
-                b.deleted = true; 
-                b.timestamp = now; 
-            } 
+
+        appBookmarks.forEach(b => {
+            if (b.folderId === id) {
+                b.deleted = true;
+                b.timestamp = now;
+            }
         });
-        
-        saveBookmarks(); 
-        renderBookmarkTab(); 
+
+        saveBookmarks();
+        renderBookmarkTab();
         showToast(t('folder_deleted'));
-        
+
         if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
             performSync(true);
         }
     }
 
-    function promptDeleteFolder(id) { 
-        showConfirm(t('delete_folder_title'), t('delete_folder_msg'), () => deleteFolder(id)); 
+    function promptDeleteFolder(id) {
+        showConfirm(t('delete_folder_title'), t('delete_folder_msg'), () => deleteFolder(id));
     }
 
     function setLastRead() {
         if (!activeVerseData) return;
-        
-        const newItem = { 
-            id: `lr_${Date.now()}`, 
-            surahId: activeVerseData.surahId, 
-            verseId: activeVerseData.verseId, 
-            pageNumber: activeVerseData.pageNumber, 
-            surahName: activeVerseData.surahName, 
-            timestamp: Date.now() 
+
+        const newItem = {
+            id: `lr_${Date.now()}`,
+            surahId: activeVerseData.surahId,
+            verseId: activeVerseData.verseId,
+            pageNumber: activeVerseData.pageNumber,
+            surahName: activeVerseData.surahName,
+            timestamp: Date.now()
         };
-        
+
         appLastRead.items = appLastRead.items.filter(item => !(item.surahId === newItem.surahId && item.verseId === newItem.verseId));
         appLastRead.items.unshift(newItem);
-        
+
         if (appLastRead.items.length > 10) appLastRead.items.pop();
-        
+
         appLastRead.timestamp = Date.now();
-        
-        saveBookmarks(); 
-        renderBookmarkTab(); 
-        showToast(t('last_read_marked')); 
+
+        saveBookmarks();
+        renderBookmarkTab();
+        showToast(t('last_read_marked'));
         closeVersePopup();
-        
+
         $$('.highlighted').forEach(el => el.classList.remove('highlighted'));
-        
+
         if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
             performSync(true);
         }
@@ -709,13 +726,13 @@
     function renderBookmarkTab() {
         const lastReadContainer = $('last-read-container');
         const titleLastRead = $('title-last-read');
-        
+
         if (appLastRead?.items?.length > 0) {
             if (titleLastRead) titleLastRead.style.display = 'block';
             let latest = appLastRead.items[0];
             const svgIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
             const svgHistory = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
-            
+
             lastReadContainer.innerHTML = `
                 <div class="list-item" style="border-left: 4px solid var(--primary);" onclick="openQuranPage(${latest.pageNumber}, ${latest.surahId}, ${latest.verseId}, 'lastread')">
                     <div class="item-number" style="background:var(--primary-light); color:var(--primary);">${svgIcon}</div>
@@ -736,7 +753,7 @@
         const folderList = $('folder-list');
         const bookmarkList = $('bookmark-list');
         const titleSemua = $('title-semua-bookmark');
-        
+
         if (!folderList || !bookmarkList) return;
 
         let folderHtml = '';
@@ -766,7 +783,7 @@
         folderList.innerHTML = folderHtml;
 
         const rootBookmarks = Utils.sortItemsArray(appBookmarks.filter(b => !b.folderId && !b.deleted));
-        
+
         if (rootBookmarks.length > 0) {
             if (titleSemua) titleSemua.style.display = 'block';
         } else {
@@ -805,7 +822,7 @@
     function openLastReadHistory() {
         const list = $('last-read-history-list');
         if (!list) return;
-        
+
         let html = '';
         if (appLastRead?.items) {
             appLastRead.items.forEach(lr => {
@@ -823,38 +840,38 @@
         list.innerHTML = html;
         $('last-read-history-modal').classList.add('active');
     }
-    function closeLastReadHistory() { 
-        $('last-read-history-modal').classList.remove('active'); 
+    function closeLastReadHistory() {
+        $('last-read-history-modal').classList.remove('active');
     }
 
     function openFolderModal(folderId = null) {
         editingFolderId = folderId;
         const modalTitle = $('folder-modal-title');
         const inputName = $('input-folder-name');
-        
+
         if (folderId) {
             const folder = appFolders.find(f => f.id === folderId);
             if (folder) {
-                modalTitle.innerText = t('edit_folder_title'); 
+                modalTitle.innerText = t('edit_folder_title');
                 inputName.value = folder.name;
-                tempFolderColor = folder.color || '#0D9488'; 
+                tempFolderColor = folder.color || '#0D9488';
                 tempFolderIcon = folder.icon || 'folder';
             }
         } else {
-            modalTitle.innerText = t('create_folder_title'); 
+            modalTitle.innerText = t('create_folder_title');
             inputName.value = '';
-            tempFolderColor = '#0D9488'; 
+            tempFolderColor = '#0D9488';
             tempFolderIcon = 'folder';
         }
-        
+
         renderFolderCustomizers();
         $('folder-modal').classList.add('active');
         inputName.focus();
     }
-    
-    function closeFolderModal() { 
-        $('folder-modal').classList.remove('active'); 
-        editingFolderId = null; 
+
+    function closeFolderModal() {
+        $('folder-modal').classList.remove('active');
+        editingFolderId = null;
     }
 
     function renderFolderCustomizers() {
@@ -864,7 +881,7 @@
             cHtml += `<div class="color-circle ${active}" style="background-color:${c};" onclick="selectFolderColor('${c}')"></div>`;
         });
         $('folder-color-picker').innerHTML = cHtml;
-        
+
         let iHtml = '';
         for (const [key, path] of Object.entries(FOLDER_ICONS)) {
             let active = key === tempFolderIcon ? 'active' : '';
@@ -872,54 +889,54 @@
         }
         $('folder-icon-picker').innerHTML = iHtml;
     }
-    
-    function selectFolderColor(c) { 
-        tempFolderColor = c; 
-        renderFolderCustomizers(); 
+
+    function selectFolderColor(c) {
+        tempFolderColor = c;
+        renderFolderCustomizers();
     }
-    
-    function selectFolderIcon(i) { 
-        tempFolderIcon = i; 
-        renderFolderCustomizers(); 
+
+    function selectFolderIcon(i) {
+        tempFolderIcon = i;
+        renderFolderCustomizers();
     }
 
     function saveFolder() {
         const name = $('input-folder-name').value.trim();
-        if (!name) { 
-            showToast(t('empty_folder_name')); 
-            return; 
+        if (!name) {
+            showToast(t('empty_folder_name'));
+            return;
         }
-        
+
         if (editingFolderId) {
             const index = appFolders.findIndex(f => f.id === editingFolderId);
             if (index > -1) {
-                appFolders[index].name = name; 
+                appFolders[index].name = name;
                 appFolders[index].color = tempFolderColor;
-                appFolders[index].icon = tempFolderIcon; 
+                appFolders[index].icon = tempFolderIcon;
                 appFolders[index].timestamp = Date.now();
             }
         } else {
             appFolders.unshift({
-                id: `f_${Date.now()}`, 
-                name: name, 
-                color: tempFolderColor, 
+                id: `f_${Date.now()}`,
+                name: name,
+                color: tempFolderColor,
                 icon: tempFolderIcon,
-                orderIndex: -Date.now(), 
-                timestamp: Date.now(), 
+                orderIndex: -Date.now(),
+                timestamp: Date.now(),
                 deleted: false
             });
         }
-        
+
         saveBookmarks();
-        
+
         if (currentViewingFolderId) {
             const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
-            if (folder) openFolderView(folder.id, folder.name); 
+            if (folder) openFolderView(folder.id, folder.name);
             else closeFolderView();
-        } else { 
-            renderBookmarkTab(); 
+        } else {
+            renderBookmarkTab();
         }
-        
+
         showToast(t('folder_created'));
         closeFolderModal();
     }
@@ -927,39 +944,39 @@
     function openMoveModal(bookmarkId) {
         bookmarkToMove = appBookmarks.find(b => b.id === bookmarkId);
         if (!bookmarkToMove) return;
-        
+
         const list = $('move-folder-list');
         let html = `<div class="move-folder-item" onclick="executeMoveBookmark(null)" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display:block;">${t('root_folder')}</div>`;
-        
+
         appFolders.filter(f => !f.deleted).forEach(f => {
             html += `<div class="move-folder-item" onclick="executeMoveBookmark('${f.id}')" style="display:flex; gap:8px; align-items:center; box-sizing:border-box;">
                         <span style="color:${f.color || '#0D9488'}; display:flex; align-items:center; flex-shrink: 0;">${Utils.getFolderSvg(f.icon)}</span>
                         <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${f.name}</span>
                     </div>`;
         });
-        
+
         list.innerHTML = html;
         $('folder-move-modal').classList.add('active');
     }
-    
-    function closeMoveModal() { 
-        $('folder-move-modal').classList.remove('active'); 
-        bookmarkToMove = null; 
+
+    function closeMoveModal() {
+        $('folder-move-modal').classList.remove('active');
+        bookmarkToMove = null;
     }
-    
+
     function executeMoveBookmark(folderId) {
         if (bookmarkToMove) {
-            bookmarkToMove.folderId = folderId; 
-            bookmarkToMove.orderIndex = -Date.now(); 
+            bookmarkToMove.folderId = folderId;
+            bookmarkToMove.orderIndex = -Date.now();
             bookmarkToMove.timestamp = Date.now();
             saveBookmarks();
-            
+
             if (currentViewingFolderId) {
                 const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
-                if (folder) openFolderView(folder.id, folder.name); 
+                if (folder) openFolderView(folder.id, folder.name);
                 else closeFolderView();
-            } else { 
-                renderBookmarkTab(); 
+            } else {
+                renderBookmarkTab();
             }
             showToast(t('bookmark_moved'));
         }
@@ -968,43 +985,43 @@
 
     function openFolderView(folderId, folderName) {
         currentViewingFolderId = folderId;
-        
+
         $('bookmark-root-view').style.display = 'none';
         $('bookmark-folder-view').style.display = 'block';
         $('current-folder-name').innerText = folderName;
-        
+
         const container = $('folder-content-list');
         const folderBookmarks = Utils.sortItemsArray(appBookmarks.filter(b => b.folderId === folderId && !b.deleted));
-        
+
         if (folderBookmarks.length === 0) {
             container.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-muted); font-size: 0.75rem;">${t('empty_folder')}</div>`;
             return;
         }
-        
+
         let html = '';
         const svgGrip = `<svg ${ICON_PROPS}><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line></svg>`;
         const svgEdit = `<svg ${ICON_PROPS}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
         const svgTrash = `<svg ${ICON_PROPS}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
 
         folderBookmarks.forEach(bm => {
-            let arabicWordsHtml = ""; 
+            let arabicWordsHtml = "";
             let hiddenWords = bm.hiddenWords || [];
-            
+
             if (db) {
                 const verseData = execQuery(`SELECT arabic_text, arabic_words FROM verses WHERE surah_number=${bm.surahId} AND verse_number=${bm.verseId}`);
                 if (verseData.length > 0) {
                     let words = [];
-                    try { 
-                        words = JSON.parse(verseData[0].arabic_words || "[]"); 
+                    try {
+                        words = JSON.parse(verseData[0].arabic_words || "[]");
                     } catch(e) {}
-                    
+
                     if (words.length === 0) {
                         words = verseData[0].arabic_text.split(' ');
                     }
                     arabicWordsHtml = words.map((w, index) => `<span class="folder-word ${hiddenWords.includes(index) ? 'hidden' : ''}">${w}</span>`).join('');
                 }
             }
-            
+
             html += `
                 <div class="list-item" data-id="${bm.id}" style="flex-direction:column; align-items:flex-start; gap:10px; padding: 12px;" onclick="openQuranPage(${bm.pageNumber}, ${bm.surahId}, ${bm.verseId}, 'bookmark')">
                     <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
@@ -1020,10 +1037,10 @@
                 </div>
             `;
         });
-        
+
         container.innerHTML = html;
     }
-    
+
     function closeFolderView() {
         currentViewingFolderId = null;
         $('bookmark-root-view').style.display = 'block';
@@ -1035,42 +1052,42 @@
         editingBookmarkId = bookmarkId;
         const bm = appBookmarks.find(b => b.id === bookmarkId);
         if (!bm) return;
-        
+
         tempHiddenWords = [...(bm.hiddenWords || [])];
         let words = [];
-        
+
         if (db) {
             const verseData = execQuery(`SELECT arabic_text, arabic_words FROM verses WHERE surah_number=${bm.surahId} AND verse_number=${bm.verseId}`);
             if (verseData.length > 0) {
-                try { 
-                    words = JSON.parse(verseData[0].arabic_words || "[]"); 
+                try {
+                    words = JSON.parse(verseData[0].arabic_words || "[]");
                 } catch(e) {}
                 if (words.length === 0) {
                     words = verseData[0].arabic_text.split(' ');
                 }
             }
         }
-        
+
         $('edit-words-container').innerHTML = words.map((w, index) => `<div class="edit-word-chip ${tempHiddenWords.includes(index) ? 'hidden' : ''}" onclick="toggleWordHidden(${index}, this)">${w}</div>`).join('');
         $('edit-words-modal').classList.add('active');
     }
-    
+
     function toggleWordHidden(index, element) {
         const pos = tempHiddenWords.indexOf(index);
-        if (pos > -1) { 
-            tempHiddenWords.splice(pos, 1); 
-            element.classList.remove('hidden'); 
-        } else { 
-            tempHiddenWords.push(index); 
-            element.classList.add('hidden'); 
+        if (pos > -1) {
+            tempHiddenWords.splice(pos, 1);
+            element.classList.remove('hidden');
+        } else {
+            tempHiddenWords.push(index);
+            element.classList.add('hidden');
         }
     }
-    
-    function closeEditWordsModal() { 
-        $('edit-words-modal').classList.remove('active'); 
-        editingBookmarkId = null; 
+
+    function closeEditWordsModal() {
+        $('edit-words-modal').classList.remove('active');
+        editingBookmarkId = null;
     }
-    
+
     function saveEditWords() {
         if (editingBookmarkId) {
             const bmIndex = appBookmarks.findIndex(b => b.id === editingBookmarkId);
@@ -1092,110 +1109,110 @@
         const data = execQuery(`SELECT * FROM surah WHERE id=${surahId}`);
         if (data.length > 0) {
             const s = data[0];
-            const subName = appSettings.appLanguage === 'en' ? s.name_latin : s.name_id;
+            const subName = appSettings.appLanguage === 'en' ? (s.name_en || s.name_latin) : (s.name_id || s.name_latin);
             $('surah-info-title').innerText = `${s.name_latin} (${subName})`;
-            
+
             let descRaw = appSettings.appLanguage === 'en' && s.long_desc_en ? s.long_desc_en : s.long_desc;
             $('surah-info-content').innerHTML = descRaw ? descRaw.replace(/\n/g, '<br><br>') : t('not_available');
-            
+
             $('surah-info-modal').classList.add('active');
         }
     }
-    
-    function closeSurahInfoModal() { 
-        $('surah-info-modal').classList.remove('active'); 
+
+    function closeSurahInfoModal() {
+        $('surah-info-modal').classList.remove('active');
     }
 
     function openGoToPopup() {
         $('goto-modal').classList.add('active');
         const currentSurahData = execQuery(`SELECT surah_number FROM verses WHERE page_number = ${currentPage} LIMIT 1`);
-        
+
         if (currentSurahData.length > 0) {
             gotoData.surah = currentSurahData[0].surah_number;
         }
-        
-        populateGoToSurah(); 
+
+        populateGoToSurah();
         updateGoToAyahAndPage(gotoData.surah);
     }
-    
-    function closeGoToPopup() { 
-        $('goto-modal').classList.remove('active'); 
+
+    function closeGoToPopup() {
+        $('goto-modal').classList.remove('active');
     }
-    
-    function executeGoTo() { 
-        closeGoToPopup(); 
-        openQuranPage(gotoData.page, gotoData.surah, gotoData.ayah, 'goto'); 
+
+    function executeGoTo() {
+        closeGoToPopup();
+        openQuranPage(gotoData.page, gotoData.surah, gotoData.ayah, 'goto');
     }
 
     function populateGoToSurah() {
         const list = $('goto-list-surah');
         const surahData = execQuery("SELECT id, name_latin, verses_count FROM surah ORDER BY id ASC");
-        
+
         list.innerHTML = surahData.map(s => `<div class="goto-item ${s.id === gotoData.surah ? 'active' : ''}" onclick="selectGoToSurah(${s.id}, ${s.verses_count})">${s.id}. ${s.name_latin}</div>`).join('');
         scrollToActiveItem(list);
     }
-    
-    function selectGoToSurah(surahId, versesCount) { 
-        gotoData.surah = surahId; 
-        gotoData.totalAyahs = versesCount; 
-        gotoData.ayah = 1; 
-        populateGoToSurah(); 
-        updateGoToAyahAndPage(surahId, 1); 
+
+    function selectGoToSurah(surahId, versesCount) {
+        gotoData.surah = surahId;
+        gotoData.totalAyahs = versesCount;
+        gotoData.ayah = 1;
+        populateGoToSurah();
+        updateGoToAyahAndPage(surahId, 1);
     }
-    
+
     function updateGoToAyahAndPage(surahId, ayahId = 1) {
         const sData = execQuery(`SELECT verses_count FROM surah WHERE id=${surahId}`);
         if (sData.length > 0) gotoData.totalAyahs = sData[0].verses_count;
         gotoData.ayah = ayahId;
-        
+
         let ayahHtml = '';
         for (let i=1; i<=gotoData.totalAyahs; i++) {
             ayahHtml += `<div class="goto-item ${i === gotoData.ayah ? 'active' : ''}" onclick="selectGoToAyah(${i})">${t('ayah')} ${i}</div>`;
         }
-        
+
         $('goto-list-ayah').innerHTML = ayahHtml;
-        scrollToActiveItem($('goto-list-ayah')); 
+        scrollToActiveItem($('goto-list-ayah'));
         updateGoToPageBySurahAyah();
     }
-    
-    function selectGoToAyah(ayahId) { 
-        gotoData.ayah = ayahId; 
-        updateGoToAyahAndPage(gotoData.surah, ayahId); 
+
+    function selectGoToAyah(ayahId) {
+        gotoData.ayah = ayahId;
+        updateGoToAyahAndPage(gotoData.surah, ayahId);
     }
-    
+
     function updateGoToPageBySurahAyah() {
         const pData = execQuery(`SELECT page_number FROM verses WHERE surah_number=${gotoData.surah} AND verse_number=${gotoData.ayah}`);
         if (pData.length > 0) gotoData.page = pData[0].page_number;
-        
+
         let pageHtml = '';
         for (let i=1; i<=604; i++) {
             pageHtml += `<div class="goto-item ${i === gotoData.page ? 'active' : ''}" onclick="selectGoToPage(${i})">${t('page')} ${i}</div>`;
         }
-        
+
         $('goto-list-page').innerHTML = pageHtml;
         scrollToActiveItem($('goto-list-page'));
     }
-    
+
     function selectGoToPage(pageId) {
         gotoData.page = pageId;
         const data = execQuery(`SELECT surah_number, verse_number FROM verses WHERE page_number=${pageId} LIMIT 1`);
-        
-        if (data.length > 0) { 
-            gotoData.surah = data[0].surah_number; 
-            gotoData.ayah = data[0].verse_number; 
+
+        if (data.length > 0) {
+            gotoData.surah = data[0].surah_number;
+            gotoData.ayah = data[0].verse_number;
         }
-        
-        populateGoToSurah(); 
+
+        populateGoToSurah();
         updateGoToAyahAndPage(gotoData.surah, gotoData.ayah);
     }
-    
+
     function scrollToActiveItem(listElement) {
         setTimeout(() => {
             const activeItem = listElement.querySelector('.active');
             if (activeItem) {
-                listElement.scrollTo({ 
-                    top: activeItem.offsetTop - (listElement.offsetHeight / 2) + (activeItem.offsetHeight / 2), 
-                    behavior: 'smooth' 
+                listElement.scrollTo({
+                    top: activeItem.offsetTop - (listElement.offsetHeight / 2) + (activeItem.offsetHeight / 2),
+                    behavior: 'smooth'
                 });
             }
         }, 10);
@@ -1207,28 +1224,28 @@
     function cleanupDnd() {
         $$('.dragging-clone, .drag-placeholder').forEach(el => el.remove());
         $$('.drag-over-folder').forEach(el => el.classList.remove('drag-over-folder'));
-        
+
         if (dndState.el) dndState.el.style.display = 'flex';
         cancelAnimationFrame(dndState.rafId);
-        
-        dndState = { 
-            el: null, clone: null, placeholder: null, startY: 0, startTop: 0, 
-            type: '', id: '', scrollContainer: null, autoScrollDir: 0, 
-            rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null 
+
+        dndState = {
+            el: null, clone: null, placeholder: null, startY: 0, startTop: 0,
+            type: '', id: '', scrollContainer: null, autoScrollDir: 0,
+            rafId: null, listContainer: null, targetFolderId: null, targetFolderEl: null
         };
     }
 
     function startDragItem(e, id, type) {
         if (e.type === 'mousedown' && e.button !== 0) return;
         cleanupDnd();
-        
+
         const btn = e.target.closest('.drag-handle');
         if (!btn) return;
-        
+
         const item = btn.closest('.list-item');
         const startYPos = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
         const startXPos = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
-        
+
         dragContext = { e, id, type, item, startY: startYPos, startX: startXPos, timer: null, active: false };
 
         dragContext.timer = setTimeout(() => {
@@ -1248,76 +1265,76 @@
 
     function handleDragMoveInit(e) {
         if (!dragContext) return;
-        
+
         const currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
         const currentX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
-        
+
         if (!dragContext.active) {
             if (Math.abs(currentY - dragContext.startY) > 8 || Math.abs(currentX - dragContext.startX) > 8) {
                 cancelDragInit();
             }
         } else {
-            e.preventDefault(); 
+            e.preventDefault();
             onDragMove(currentY);
         }
     }
 
     function cancelDragInit() {
-        if (dragContext && !dragContext.active) { 
-            clearTimeout(dragContext.timer); 
-            cleanupDragEvents(); 
-            dragContext = null; 
+        if (dragContext && !dragContext.active) {
+            clearTimeout(dragContext.timer);
+            cleanupDragEvents();
+            dragContext = null;
         } else if (dragContext && dragContext.active) {
             onDragEnd();
         }
     }
 
     function cleanupDragEvents() {
-        document.removeEventListener('mousemove', handleDragMoveInit); 
+        document.removeEventListener('mousemove', handleDragMoveInit);
         document.removeEventListener('touchmove', handleDragMoveInit);
-        document.removeEventListener('mouseup', cancelDragInit); 
+        document.removeEventListener('mouseup', cancelDragInit);
         document.removeEventListener('touchend', cancelDragInit);
-        document.removeEventListener('touchcancel', cancelDragInit); 
+        document.removeEventListener('touchcancel', cancelDragInit);
         window.removeEventListener('blur', cancelDragInit);
     }
 
     function executeDragStart(ctx) {
         dndState.listContainer = ctx.item.parentElement;
         dndState.scrollContainer = document.querySelector('.tab-pane.active');
-        dndState.type = ctx.type; 
-        dndState.id = ctx.id; 
+        dndState.type = ctx.type;
+        dndState.id = ctx.id;
         dndState.el = ctx.item;
-        
+
         const originalTransform = ctx.item.style.transform;
         const originalTransition = ctx.item.style.transition;
-        
-        ctx.item.style.transition = 'none'; 
+
+        ctx.item.style.transition = 'none';
         ctx.item.style.transform = 'none';
-        
+
         const rect = ctx.item.getBoundingClientRect();
-        
-        ctx.item.style.transform = originalTransform; 
+
+        ctx.item.style.transform = originalTransform;
         ctx.item.style.transition = originalTransition;
-        dndState.startY = ctx.startY; 
+        dndState.startY = ctx.startY;
         dndState.startTop = rect.top;
-        
-        dndState.clone = ctx.item.cloneNode(true); 
+
+        dndState.clone = ctx.item.cloneNode(true);
         dndState.clone.classList.add('dragging-clone');
-        dndState.clone.style.width = rect.width + 'px'; 
+        dndState.clone.style.width = rect.width + 'px';
         dndState.clone.style.height = rect.height + 'px';
-        dndState.clone.style.left = rect.left + 'px'; 
+        dndState.clone.style.left = rect.left + 'px';
         dndState.clone.style.top = rect.top + 'px';
-        
+
         document.body.appendChild(dndState.clone);
-        
-        dndState.placeholder = document.createElement('div'); 
+
+        dndState.placeholder = document.createElement('div');
         dndState.placeholder.className = 'drag-placeholder';
-        dndState.placeholder.style.height = rect.height + 'px'; 
+        dndState.placeholder.style.height = rect.height + 'px';
         dndState.placeholder.style.width = rect.width + 'px';
-        
+
         dndState.listContainer.insertBefore(dndState.placeholder, ctx.item);
         ctx.item.style.display = 'none';
-        
+
         dndState.rafId = requestAnimationFrame(dragAutoScroll);
     }
 
@@ -1325,7 +1342,7 @@
         const deltaY = currentY - dndState.startY;
         dndState.clone.style.top = (dndState.startTop + deltaY) + 'px';
         const scrollRect = dndState.scrollContainer.getBoundingClientRect();
-        
+
         if (currentY < scrollRect.top + 70) dndState.autoScrollDir = -1;
         else if (currentY > scrollRect.bottom - 70) dndState.autoScrollDir = 1;
         else dndState.autoScrollDir = 0;
@@ -1335,18 +1352,18 @@
         if (dndState.autoScrollDir !== 0 && dndState.scrollContainer) {
             dndState.scrollContainer.scrollTop += dndState.autoScrollDir * 8;
         }
-        
+
         if (dndState.clone) {
             const cloneRect = dndState.clone.getBoundingClientRect();
             const hitX = cloneRect.left + cloneRect.width / 2;
             const hitY = cloneRect.top + cloneRect.height / 2;
-            
+
             dndState.clone.style.display = 'none';
             const hitElement = document.elementFromPoint(hitX, hitY);
             dndState.clone.style.display = 'flex';
-            
+
             let isHoveringFolder = false;
-            
+
             if (hitElement) {
                 if (dndState.type === 'bookmark' && currentViewingFolderId === null) {
                     const hitFolder = hitElement.closest('.folder-item');
@@ -1354,18 +1371,18 @@
                         isHoveringFolder = true;
                         if (dndState.targetFolderEl !== hitFolder) {
                             if (dndState.targetFolderEl) dndState.targetFolderEl.classList.remove('drag-over-folder');
-                            dndState.targetFolderEl = hitFolder; 
+                            dndState.targetFolderEl = hitFolder;
                             dndState.targetFolderId = hitFolder.dataset.id;
-                            hitFolder.classList.add('drag-over-folder'); 
+                            hitFolder.classList.add('drag-over-folder');
                             dndState.placeholder.style.display = 'none';
                         }
                     }
                 }
-                
+
                 if (!isHoveringFolder) {
                     if (dndState.targetFolderEl) {
                         dndState.targetFolderEl.classList.remove('drag-over-folder');
-                        dndState.targetFolderEl = null; 
+                        dndState.targetFolderEl = null;
                         dndState.targetFolderId = null;
                         dndState.placeholder.style.display = 'block';
                     }
@@ -1385,51 +1402,51 @@
     }
 
     function onDragEnd() {
-        cleanupDragEvents(); 
+        cleanupDragEvents();
         dragContext = null;
-        
-        if (!dndState.clone) { 
-            cleanupDnd(); 
-            return; 
+
+        if (!dndState.clone) {
+            cleanupDnd();
+            return;
         }
-        
+
         if (dndState.targetFolderId && dndState.type === 'bookmark') {
             const bm = appBookmarks.find(b => b.id === dndState.id);
             if (bm) {
-                bm.folderId = dndState.targetFolderId; 
-                bm.timestamp = Date.now(); 
+                bm.folderId = dndState.targetFolderId;
+                bm.timestamp = Date.now();
                 saveBookmarks();
                 const folderName = appFolders.find(f => f.id === dndState.targetFolderId)?.name || '';
                 showToast(`${t('bookmark_moved')} 📁 ${folderName}`);
             }
-            cleanupDnd(); 
+            cleanupDnd();
             renderBookmarkTab();
         } else {
             dndState.listContainer.insertBefore(dndState.el, dndState.placeholder);
             const elements = Array.from(dndState.listContainer.querySelectorAll('.list-item'));
-            
+
             elements.forEach((el, index) => {
                 const id = el.dataset.id;
                 if (id) {
                     let item = appFolders.find(f => f.id === id) || appBookmarks.find(b => b.id === id);
-                    if (item && item.orderIndex !== index) { 
-                        item.orderIndex = index; 
-                        item.timestamp = Date.now(); 
+                    if (item && item.orderIndex !== index) {
+                        item.orderIndex = index;
+                        item.timestamp = Date.now();
                     }
                 }
             });
-            
-            cleanupDnd(); 
+
+            cleanupDnd();
             saveBookmarks();
-            
+
             if (currentViewingFolderId) {
                 const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
                 if (folder) openFolderView(folder.id, folder.name);
-            } else { 
-                renderBookmarkTab(); 
+            } else {
+                renderBookmarkTab();
             }
         }
-        
+
         if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
             performSync(true);
         }
@@ -1442,17 +1459,17 @@
         if (quranTrackInitialized) return;
         const track = $('quran-slider-track');
         if (!track) return;
-        
+
         track.innerHTML = '';
         for (let i = 1; i <= 604; i++) {
-            let card = document.createElement('div'); 
-            card.className = 'slide-card'; 
+            let card = document.createElement('div');
+            card.className = 'slide-card';
             card.id = `quran-page-${i}`;
-            card.innerHTML = `<div class="quran-page-content arabic" dir="rtl"></div>`; 
+            card.innerHTML = `<div class="quran-page-content arabic" dir="rtl"></div>`;
             track.appendChild(card);
         }
-        
-        quranTrackInitialized = true; 
+
+        quranTrackInitialized = true;
         setupQuranTouchEvents();
     }
 
@@ -1460,38 +1477,38 @@
         const popup = $('verse-popup');
         const translateBtn = $('vp-btn-translate');
         const transContainer = $('vp-translation-text');
-        
+
         if (keepTranslationExpanded && activeVerseData) {
             let text = activeVerseData.translationText.replace(/&quot;/g, '"').replace(/\\'/g, "'");
             transContainer.innerHTML = Utils.formatTranslation(text) || t('no_translation');
-            popup.classList.add('expanded'); 
+            popup.classList.add('expanded');
             if (translateBtn) translateBtn.classList.add('active-btn');
         } else {
-            popup.classList.remove('expanded'); 
+            popup.classList.remove('expanded');
             if (translateBtn) translateBtn.classList.remove('active-btn');
-            setTimeout(() => { 
-                if (!popup.classList.contains('expanded')) transContainer.innerHTML = ""; 
+            setTimeout(() => {
+                if (!popup.classList.contains('expanded')) transContainer.innerHTML = "";
             }, 400);
         }
     }
 
     function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, translationText, element) {
         if (preventNextClick) return;
-        
+
         const popup = $('verse-popup');
         const isPopupActive = popup.classList.contains('active');
 
         if (element.classList.contains('highlighted') && window._currentClickAction == null) {
             if (!isPopupActive) {
                 activeVerseData = { surahId, verseId, pageNumber, surahName, arabicText, translationText };
-                $('vp-title').innerText = surahName; 
+                $('vp-title').innerText = surahName;
                 $('vp-subtitle').innerText = `${t('ayah')} ${verseId}`;
-                applyTranslationState(); 
-                popup.classList.add('active'); 
+                applyTranslationState();
+                popup.classList.add('active');
                 return;
             } else {
-                element.classList.remove('highlighted'); 
-                closeVersePopup(); 
+                element.classList.remove('highlighted');
+                closeVersePopup();
                 return;
             }
         }
@@ -1503,16 +1520,16 @@
         if (window._currentClickAction === 'bookmark' || window._currentClickAction === 'lastread') {
             closeVersePopup();
         } else {
-            $('vp-title').innerText = surahName; 
+            $('vp-title').innerText = surahName;
             $('vp-subtitle').innerText = `${t('ayah')} ${verseId}`;
-            applyTranslationState(); 
+            applyTranslationState();
             popup.classList.add('active');
         }
     }
 
     function togglePopupTranslation() {
         if (!activeVerseData) return;
-        keepTranslationExpanded = !keepTranslationExpanded; 
+        keepTranslationExpanded = !keepTranslationExpanded;
         applyTranslationState();
     }
 
@@ -1520,10 +1537,10 @@
         const popup = $('verse-popup');
         if (popup) {
             popup.classList.remove('active', 'expanded');
-            $('vp-btn-translate').classList.remove('active-btn'); 
+            $('vp-btn-translate').classList.remove('active-btn');
             keepTranslationExpanded = false;
-            setTimeout(() => { 
-                if (!popup.classList.contains('expanded')) $('vp-translation-text').innerHTML = ""; 
+            setTimeout(() => {
+                if (!popup.classList.contains('expanded')) $('vp-translation-text').innerHTML = "";
             }, 400);
         }
         activeVerseData = null;
@@ -1532,9 +1549,9 @@
     function copyVerseText() {
         if (!activeVerseData) return;
         const textToCopy = `${activeVerseData.arabicText}\n\n"${activeVerseData.translationText}"\n(QS. ${activeVerseData.surahName} : ${activeVerseData.verseId})`;
-        
+
         navigator.clipboard.writeText(textToCopy).then(() => {
-            showToast(t('copied')); 
+            showToast(t('copied'));
             closeVersePopup();
             $$('.highlighted').forEach(el => el.classList.remove('highlighted'));
         }).catch(err => console.error('Gagal menyalin:', err));
@@ -1546,27 +1563,27 @@
         if (!container) return;
         if (container.dataset.loaded === "true" && !forceRender) return;
 
-        const verses = execQuery(`SELECT v.*, s.name_ar, s.name_latin, s.name_id, s.location, s.verses_count FROM verses v LEFT JOIN surah s ON v.surah_number = s.id WHERE v.page_number = ${pageNumber} ORDER BY v.surah_number, v.verse_number`);
+        const verses = execQuery(`SELECT v.*, s.name_ar, s.name_latin, s.name_id, s.name_en, s.location, s.verses_count FROM verses v LEFT JOIN surah s ON v.surah_number = s.id WHERE v.page_number = ${pageNumber} ORDER BY v.surah_number, v.verse_number`);
 
         if (verses.length === 0) {
-            container.innerHTML = `<div style="text-align:center; padding:50px; color: var(--text-muted); font-size: 0.8rem;">${t('data_not_found')}</div>`; 
+            container.innerHTML = `<div style="text-align:center; padding:50px; color: var(--text-muted); font-size: 0.8rem;">${t('data_not_found')}</div>`;
             return;
         }
 
         const isMushafMode = !appSettings.wordByWord && !appSettings.showTransliteration && !appSettings.showTranslation;
-        
-        if (isMushafMode) { 
-            container.classList.remove('list-mode'); 
-            container.classList.add('mushaf-mode'); 
-        } else { 
-            container.classList.remove('mushaf-mode'); 
-            container.classList.add('list-mode'); 
+
+        if (isMushafMode) {
+            container.classList.remove('list-mode');
+            container.classList.add('mushaf-mode');
+        } else {
+            container.classList.remove('mushaf-mode');
+            container.classList.add('list-mode');
         }
 
         let html = '';
         verses.forEach(v => {
             if (v.verse_number === 1) {
-                const surahSubName = appSettings.appLanguage === 'en' ? v.name_latin : v.name_id;
+                const surahSubName = appSettings.appLanguage === 'en' ? (v.name_en || v.name_latin) : (v.name_id || v.name_latin);
                 html += `
                     <div class="surah-header-separator" onclick="openSurahInfoModal(${v.surah_number})">
                         <div class="surah-col-left">${v.verses_count}<br>${t('ayah')}</div>
@@ -1580,12 +1597,12 @@
                 `;
             }
 
-            let fullArabicText = v.arabic_text || ''; 
+            let fullArabicText = v.arabic_text || '';
             let textForCopy = fullArabicText;
-            
-            try { 
-                let arWords = JSON.parse(v.arabic_words || "[]"); 
-                if (arWords.length > 0) textForCopy = arWords.slice(0, -1).join(' '); 
+
+            try {
+                let arWords = JSON.parse(v.arabic_words || "[]");
+                if (arWords.length > 0) textForCopy = arWords.slice(0, -1).join(' ');
             } catch (e) {}
 
             if (v.surah_number !== 1 && v.surah_number !== 9 && v.verse_number === 1) {
@@ -1611,13 +1628,13 @@
                     html += `<div class="wbw-container">`;
                     let arWords = [], trWords = [], tlWords = [];
                     try {
-                        arWords = JSON.parse(v.arabic_words || "[]"); 
+                        arWords = JSON.parse(v.arabic_words || "[]");
                         trWords = JSON.parse(v.transliteration_words || "[]");
                         if (appSettings.showTranslation) {
                             tlWords = appSettings.appLanguage === 'en' ? JSON.parse(v.translation_en_words || "[]") : JSON.parse(v.translation_id_words || "[]");
                         }
                     } catch (e) {}
-                    
+
                     if (arWords.length > 0) {
                         for (let i = 0; i < arWords.length; i++) {
                             html += `<div class="word-group"><div class="word-arabic">${arWords[i] || ''}</div>`;
@@ -1637,82 +1654,104 @@
                 html += `</div>`;
             }
         });
-        
-        container.innerHTML = html; 
+
+        container.innerHTML = html;
         container.dataset.loaded = "true";
     }
 
     function openQuranPage(pageNumber, highlightSurah = null, highlightVerse = null, actionType = null) {
-        currentPage = pageNumber; 
-        Storage.setString('quran_last_page', pageNumber); 
+        currentPage = pageNumber;
+        Storage.setString('quran_last_page', pageNumber);
         Storage.setString('quran_is_reading', 'true');
-        
-        $('quran-view').classList.add('active'); 
+
+        $('quran-view').classList.add('active');
         $('home-view').classList.remove('active');
-        
+
         if (!quranTrackInitialized) initQuranTrack();
-        
+
         // Panggil request Wake Lock ketika membuka mode baca
         requestWakeLock();
-        
-        renderPageContent(currentPage); 
-        $('quran-slider-track').style.transition = 'none'; 
+
+        renderPageContent(currentPage);
+        $('quran-slider-track').style.transition = 'none';
         updateQuranUI();
-        
-        const activeCard = $(`quran-page-${currentPage}`); 
+
+        const activeCard = $(`quran-page-${currentPage}`);
         if (activeCard) activeCard.scrollTo({ top: 0 });
 
         setTimeout(() => {
             $('quran-slider-track').style.transition = 'transform 0.45s cubic-bezier(0.25, 1, 0.5, 1)';
-            renderPageContent(currentPage - 1); 
+            renderPageContent(currentPage - 1);
             renderPageContent(currentPage + 1);
-            
+
             if (highlightSurah && highlightVerse) {
                 const targetEl = $(`verse-wrap-${highlightSurah}-${highlightVerse}`);
-                if (targetEl) { 
-                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
-                    if (!targetEl.classList.contains('highlighted')) { 
-                        window._currentClickAction = actionType; 
-                        targetEl.click(); 
-                        window._currentClickAction = null; 
-                    } 
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (!targetEl.classList.contains('highlighted')) {
+                        window._currentClickAction = actionType;
+                        targetEl.click();
+                        window._currentClickAction = null;
+                    }
                 }
             }
         }, 150);
     }
 
     function updateQuranUI() {
-        let headerText = `${t('page')} ${currentPage}`; 
+        let headerText = `${t('page')} ${currentPage}`;
         let headerParts = [];
         const pageVerses = execQuery(`SELECT surah_number, verse_number, juz_number FROM verses WHERE page_number = ${currentPage}`);
-        
+
         if (pageVerses.length > 0) {
-            const surahGroups = {}; 
+            const surahGroups = {};
             const juzSet = new Set();
-            
+
             pageVerses.forEach(v => {
                 if (!surahGroups[v.surah_number]) surahGroups[v.surah_number] = [];
-                surahGroups[v.surah_number].push(v.verse_number); 
+                surahGroups[v.surah_number].push(v.verse_number);
                 if (v.juz_number) juzSet.add(v.juz_number);
             });
-            
+
             for (const surahId in surahGroups) {
                 const versesInSurah = surahGroups[surahId];
-                const minVerse = Math.min(...versesInSurah); 
+                const minVerse = Math.min(...versesInSurah);
                 const maxVerse = Math.max(...versesInSurah);
                 const surahInfo = execQuery(`SELECT name_latin FROM surah WHERE id = ${surahId}`);
                 const surahName = surahInfo.length > 0 ? surahInfo[0].name_latin : `Surah ${surahId}`;
-                
+
                 if (minVerse === maxVerse) headerParts.push(`${surahId}. ${surahName}: ${minVerse}`);
                 else headerParts.push(`${surahId}. ${surahName}: ${minVerse}-${maxVerse}`);
             }
-            
-            const surahString = headerParts.join(' | '); 
+
+            const surahString = headerParts.join(' | ');
             const juzString = Array.from(juzSet).join('-');
-            
-            headerText = `<span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem;">${surahString}</span><span style="display: block; font-size: 0.65rem; font-weight: 600; color: var(--text-muted); margin-top: 2px;">${juzString ? t('juz') + ' ' + juzString : ''}</span>`;
+
+            // Logika Sisa Halaman ke Juz Berikutnya (Terjemahan Dinamis)
+            let remainingPagesText = '';
+            const maxJuz = Math.max(...Array.from(juzSet));
+
+            if (maxJuz && maxJuz < 30) {
+                const nextJuzQuery = execQuery(`SELECT page_number FROM verses WHERE juz_number = ${maxJuz + 1} ORDER BY id ASC LIMIT 1`);
+                if (nextJuzQuery.length > 0) {
+                    const nextJuzPage = nextJuzQuery[0].page_number;
+                    const remainingPages = nextJuzPage - currentPage;
+
+                    if (remainingPages > 0) {
+                        let txt = t('rem_pages').replace('{n}', remainingPages).replace('{j}', maxJuz + 1);
+                        remainingPagesText = ` • ${txt}`;
+                    } else if (remainingPages === 0) {
+                        let txt = t('start_juz').replace('{j}', maxJuz + 1);
+                        remainingPagesText = ` • ${txt}`;
+                    }
+                }
+            } else if (maxJuz === 30) {
+                remainingPagesText = ` • ${t('last_juz')}`;
+            }
+
+            headerText = `<span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem;">${surahString}</span><span style="display: block; font-size: 0.65rem; font-weight: 600; color: var(--text-muted); margin-top: 2px;">${juzString ? t('juz') + ' ' + juzString : ''}${remainingPagesText}</span>`;
         }
-        
+
         $('quran-header-title').innerHTML = headerText;
         $('page-info-pill').innerText = `${t('page')} ${currentPage}`;
         $('btn-prev-page').disabled = (currentPage <= 1);
@@ -1726,122 +1765,122 @@
     function changePage(delta) {
         let newPage = currentPage + delta;
         if (newPage >= 1 && newPage <= 604) {
-            closeVersePopup(); 
+            closeVersePopup();
             $$('.highlighted').forEach(el => el.classList.remove('highlighted'));
-            
-            currentPage = newPage; 
+
+            currentPage = newPage;
             Storage.setString('quran_last_page', currentPage);
             renderPageContent(currentPage);
-            
+
             const track = $('quran-slider-track');
             if (track) track.style.transition = 'transform 0.45s cubic-bezier(0.25, 1, 0.5, 1)';
-            
+
             updateQuranUI();
-            
+
             const activeCard = $(`quran-page-${currentPage}`);
             if (activeCard) activeCard.scrollTo({ top: 0, behavior: 'smooth' });
-            
-            setTimeout(() => { 
-                renderPageContent(currentPage - 1); 
-                renderPageContent(currentPage + 1); 
+
+            setTimeout(() => {
+                renderPageContent(currentPage - 1);
+                renderPageContent(currentPage + 1);
             }, 400);
         }
     }
 
     function setupQuranTouchEvents() {
-        const viewport = $('quran-slider-viewport'); 
+        const viewport = $('quran-slider-viewport');
         if (!viewport) return;
-        
+
         let isScrolling = null, ignoreMouseSwipe = false;
 
         const onStart = (e) => {
-            if (e.type === 'touchstart') ignoreMouseSwipe = true; 
+            if (e.type === 'touchstart') ignoreMouseSwipe = true;
             if (e.type === 'mousedown' && ignoreMouseSwipe) return;
-            
-            isDragging = true; 
-            isScrolling = null; 
+
+            isDragging = true;
+            isScrolling = null;
             globalIsDragging = false;
-            
-            startX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX; 
+
+            startX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
             startY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
-            
-            const track = $('quran-slider-track'); 
+
+            const track = $('quran-slider-track');
             if (track) track.style.transition = 'none';
         };
-        
+
         const onMove = (e) => {
-            if (e.type === 'mousemove' && ignoreMouseSwipe) return; 
+            if (e.type === 'mousemove' && ignoreMouseSwipe) return;
             if (!isDragging) return;
-            
-            const currentX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX; 
+
+            const currentX = e.type.includes('mouse') ? e.pageX : e.touches[0].clientX;
             const currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
             const diffX = currentX - startX, diffY = currentY - startY;
 
             if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
-                if (!globalIsDragging) { 
-                    globalIsDragging = true; 
-                    closeVersePopup(); 
-                    $$('.highlighted').forEach(el => el.classList.remove('highlighted')); 
+                if (!globalIsDragging) {
+                    globalIsDragging = true;
+                    closeVersePopup();
+                    $$('.highlighted').forEach(el => el.classList.remove('highlighted'));
                 }
             }
-            if (isScrolling === null) { 
-                if (Math.abs(diffX) > 3 || Math.abs(diffY) > 3) isScrolling = Math.abs(diffY) > Math.abs(diffX); 
+            if (isScrolling === null) {
+                if (Math.abs(diffX) > 3 || Math.abs(diffY) > 3) isScrolling = Math.abs(diffY) > Math.abs(diffX);
             }
             if (isScrolling) return;
 
             if (e.cancelable) e.preventDefault();
-            
+
             const percentMove = (diffX / viewport.offsetWidth) * 100;
             const track = $('quran-slider-track');
             if (track) track.style.transform = `translate3d(${((currentPage - 1) * 100) + percentMove}%, 0, 0)`;
         };
-        
+
         const onEnd = (e) => {
-            if (e.type === 'mouseup' && ignoreMouseSwipe) return; 
+            if (e.type === 'mouseup' && ignoreMouseSwipe) return;
             if (!isDragging) return;
             isDragging = false;
-            
-            if (globalIsDragging) { 
-                preventNextClick = true; 
-                setTimeout(() => preventNextClick = false, 300); 
+
+            if (globalIsDragging) {
+                preventNextClick = true;
+                setTimeout(() => preventNextClick = false, 300);
             }
-            
+
             if (e.type === 'touchend') setTimeout(() => { ignoreMouseSwipe = false; }, 300);
             if (isScrolling) { isScrolling = null; return; }
 
-            const endX = e.type.includes('mouse') ? e.pageX : e.changedTouches[0].clientX; 
+            const endX = e.type.includes('mouse') ? e.pageX : e.changedTouches[0].clientX;
             const diff = endX - startX;
-            
+
             if (diff > 70 && currentPage < 604) changePage(1);
             else if (diff < -70 && currentPage > 1) changePage(-1);
-            else { 
-                const track = $('quran-slider-track'); 
-                if (track) { 
-                    track.style.transition = 'transform 0.45s cubic-bezier(0.25, 1, 0.5, 1)'; 
-                    track.style.transform = `translate3d(${(currentPage - 1) * 100}%, 0, 0)`; 
-                } 
+            else {
+                const track = $('quran-slider-track');
+                if (track) {
+                    track.style.transition = 'transform 0.45s cubic-bezier(0.25, 1, 0.5, 1)';
+                    track.style.transform = `translate3d(${(currentPage - 1) * 100}%, 0, 0)`;
+                }
             }
         };
 
-        viewport.addEventListener('mousedown', onStart); 
+        viewport.addEventListener('mousedown', onStart);
         viewport.addEventListener('mousemove', onMove, { passive: false });
-        viewport.addEventListener('mouseup', onEnd); 
+        viewport.addEventListener('mouseup', onEnd);
         viewport.addEventListener('mouseleave', onEnd);
-        viewport.addEventListener('touchstart', onStart, { passive: true }); 
+        viewport.addEventListener('touchstart', onStart, { passive: true });
         viewport.addEventListener('touchmove', onMove, { passive: false });
         viewport.addEventListener('touchend', onEnd);
     }
 
     function closeQuran() {
-        closeVersePopup(); 
+        closeVersePopup();
         $$('.highlighted').forEach(el => el.classList.remove('highlighted'));
-        
-        $('quran-view').classList.remove('active'); 
+
+        $('quran-view').classList.remove('active');
         $('home-view').classList.add('active');
-        
-        closeAllSheets(); 
+
+        closeAllSheets();
         Storage.remove('quran_is_reading');
-        
+
         // Matikan fungsi wake lock ketika tidak di mode pembacaan
         releaseWakeLock();
     }
@@ -1850,21 +1889,21 @@
     // 14. BOTTOM SHEETS & SETTINGS MENUS
     // =========================================
     function openSettings() {
-        closeVersePopup(); 
+        closeVersePopup();
         $$('.highlighted').forEach(el => el.classList.remove('highlighted'));
-        
-        applySettingsToUI(); 
-        $('info-sheet').classList.add('expanded'); 
+
+        applySettingsToUI();
+        $('info-sheet').classList.add('expanded');
         checkOverlay();
     }
-    
-    function closeAllSheets() { 
-        $('info-sheet').classList.remove('expanded'); 
-        checkOverlay(); 
+
+    function closeAllSheets() {
+        $('info-sheet').classList.remove('expanded');
+        checkOverlay();
     }
-    
-    function checkOverlay() { 
-        $('sheet-overlay').classList.toggle('active', $('info-sheet').classList.contains('expanded')); 
+
+    function checkOverlay() {
+        $('sheet-overlay').classList.toggle('active', $('info-sheet').classList.contains('expanded'));
     }
 
     function applySettingsToUI() {
@@ -1872,11 +1911,11 @@
         $('toggle-perkata').checked = appSettings.wordByWord;
         $('toggle-transliterasi').checked = appSettings.showTransliteration;
         $('toggle-translation').checked = appSettings.showTranslation;
-        
-        // Sync nilai toggle fitur baru dengan appSettings global 
+
+        // Sync nilai toggle fitur baru dengan appSettings global
         const screenOnToggle = $('toggle-screen-on');
         if (screenOnToggle) screenOnToggle.checked = appSettings.keepScreenOn;
-        
+
         const fsToggle = $('toggle-fullscreen');
         if (fsToggle) fsToggle.checked = !!document.fullscreenElement;
     }
@@ -1886,7 +1925,7 @@
         appSettings.wordByWord = $('toggle-perkata').checked;
         appSettings.showTransliteration = $('toggle-transliterasi').checked;
         appSettings.showTranslation = $('toggle-translation').checked;
-        
+
         const screenOnToggle = $('toggle-screen-on');
         if (screenOnToggle) {
             appSettings.keepScreenOn = screenOnToggle.checked;
@@ -1895,9 +1934,9 @@
         appSettings.timestamp = Date.now();
         Storage.setJson('quran_settings', appSettings);
 
-        applyUILanguage(); 
+        applyUILanguage();
         applySettings();
-        
+
         // Trigger Wake Lock sesuai toggle-nya
         if (appSettings.keepScreenOn && $('quran-view').classList.contains('active')) {
             requestWakeLock();
@@ -1908,16 +1947,16 @@
         $$('.quran-page-content').forEach(container => container.dataset.loaded = "false");
 
         if ($('quran-view').classList.contains('active')) {
-            renderPageContent(currentPage, true); 
-            renderPageContent(currentPage - 1, true); 
-            renderPageContent(currentPage + 1, true); 
+            renderPageContent(currentPage, true);
+            renderPageContent(currentPage - 1, true);
+            renderPageContent(currentPage + 1, true);
             updateQuranUI();
         } else {
-            renderSurahList(); 
-            renderJuzList(); 
+            renderSurahList();
+            renderJuzList();
             renderBookmarkTab();
         }
-        
+
         if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
             performSync(true);
         }
@@ -1926,8 +1965,8 @@
     function loadSettings() {
         const saved = Storage.getJson('quran_settings', null);
         if (saved) appSettings = { ...appSettings, ...saved };
-        applySettingsToUI(); 
-        applyUILanguage(); 
+        applySettingsToUI();
+        applyUILanguage();
         applySettings();
     }
 
@@ -1947,52 +1986,52 @@
     function setupSheetDrag(sheetId, dragAreaId) {
         const sheet = $(sheetId), dragArea = $(dragAreaId);
         if (!sheet || !dragArea) return;
-        
+
         let startY = 0, currentY = 0, isDraggingSheet = false;
 
-        const onStart = (e) => { 
-            isDraggingSheet = true; 
-            startY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY; 
-            sheet.style.transition = 'none'; 
+        const onStart = (e) => {
+            isDraggingSheet = true;
+            startY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+            sheet.style.transition = 'none';
         };
-        
+
         const onMove = (e) => {
-            if (!isDraggingSheet) return; 
+            if (!isDraggingSheet) return;
             if (e.cancelable) e.preventDefault();
-            
-            currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY; 
+
+            currentY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
             const diff = currentY - startY;
             let transformY = sheet.classList.contains('expanded') ? diff : (sheet.offsetHeight - 50) + diff;
-            
-            if (transformY < 0) transformY = 0; 
+
+            if (transformY < 0) transformY = 0;
             sheet.style.transform = `translateY(${transformY}px)`;
         };
-        
+
         const onEnd = (e) => {
-            if (!isDraggingSheet) return; 
+            if (!isDraggingSheet) return;
             isDraggingSheet = false;
             sheet.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
-            
-            const diff = currentY - startY; 
+
+            const diff = currentY - startY;
             const isExpanded = sheet.classList.contains('expanded');
-            
+
             if (Math.abs(diff) > 50) {
                 if (isExpanded && diff > 50) sheet.classList.remove('expanded');
                 else if (!isExpanded && diff < -50) sheet.classList.add('expanded');
             } else if (Math.abs(diff) < 10) {
                 sheet.classList.toggle('expanded');
             }
-            
-            sheet.style.transform = ''; 
+
+            sheet.style.transform = '';
             checkOverlay();
         };
 
-        dragArea.addEventListener('mousedown', onStart); 
-        document.addEventListener('mousemove', onMove, { passive: false }); 
+        dragArea.addEventListener('mousedown', onStart);
+        document.addEventListener('mousemove', onMove, { passive: false });
         document.addEventListener('mouseup', onEnd);
-        
-        dragArea.addEventListener('touchstart', onStart, { passive: true }); 
-        document.addEventListener('touchmove', onMove, { passive: false }); 
+
+        dragArea.addEventListener('touchstart', onStart, { passive: true });
+        document.addEventListener('touchmove', onMove, { passive: false });
         document.addEventListener('touchend', onEnd);
     }
 
@@ -2000,11 +2039,11 @@
     // 15. GOOGLE DRIVE SYNC MODULE
     // =========================================
     function initGoogleSync() {
-        if (typeof google === 'undefined') { 
-            setTimeout(initGoogleSync, 500); 
-            return; 
+        if (typeof google === 'undefined') {
+            setTimeout(initGoogleSync, 500);
+            return;
         }
-        
+
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: '219268814398-2lsp4fspvpat7quoc7jq6qe9jpi13c1g.apps.googleusercontent.com',
             scope: 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email',
@@ -2012,11 +2051,11 @@
                 if (tokenResponse && tokenResponse.access_token) {
                     driveAccessToken = tokenResponse.access_token;
                     const expiryTime = Date.now() + (tokenResponse.expires_in * 1000) - 60000;
-                    
+
                     Storage.setString('quran_gdrive_token', driveAccessToken);
                     Storage.setString('quran_gdrive_token_expiry', expiryTime.toString());
                     Storage.setString('quran_gdrive_linked', 'true');
-                    
+
                     fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { 'Authorization': 'Bearer ' + driveAccessToken } })
                         .then(res => res.json())
                         .then(data => {
@@ -2026,8 +2065,8 @@
                                 updateToolboxUI();
                             }
                         }).catch(err => console.error(err));
-                        
-                    updateToolboxUI(); 
+
+                    updateToolboxUI();
                     performSync();
                 }
             },
@@ -2038,35 +2077,35 @@
     function checkAndRestoreToken() {
         if (driveAccessToken) {
             const tokenExpiry = Storage.getString('quran_gdrive_token_expiry');
-            if (tokenExpiry && Date.now() >= parseInt(tokenExpiry)) { 
-                driveAccessToken = ''; 
-                return false; 
+            if (tokenExpiry && Date.now() >= parseInt(tokenExpiry)) {
+                driveAccessToken = '';
+                return false;
             }
             return true;
         }
         const savedToken = Storage.getString('quran_gdrive_token');
         const tokenExpiry = Storage.getString('quran_gdrive_token_expiry');
-        if (savedToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) { 
-            driveAccessToken = savedToken; 
-            return true; 
+        if (savedToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) {
+            driveAccessToken = savedToken;
+            return true;
         }
         return false;
     }
 
     function handleAuthClick() {
-        if (!tokenClient) { 
-            showToast(t('sync_not_ready')); 
-            return; 
+        if (!tokenClient) {
+            showToast(t('sync_not_ready'));
+            return;
         }
         const isLinked = Storage.getString('quran_gdrive_linked') === 'true';
-        if (isLinked && checkAndRestoreToken()) { 
-            showToast(t('syncing')); 
-            performSync(); 
-            return; 
+        if (isLinked && checkAndRestoreToken()) {
+            showToast(t('syncing'));
+            performSync();
+            return;
         }
         showToast(isLinked ? t('syncing') : t('auth_google'));
         if (isLinked) {
-            tokenClient.requestAccessToken({prompt: ''}); 
+            tokenClient.requestAccessToken({prompt: ''});
         } else {
             tokenClient.requestAccessToken();
         }
@@ -2075,9 +2114,9 @@
     function handleLogout() {
         showConfirm(t('logout_prompt_title'), t('logout_prompt_msg'), () => {
             ['quran_gdrive_linked', 'quran_gdrive_token', 'quran_gdrive_token_expiry', 'quran_sync_email', 'quran_sync_avatar', 'quran_last_sync', 'quran_drive_file_id'].forEach(k => Storage.remove(k));
-            driveAccessToken = ''; 
-            driveFileId = null; 
-            updateToolboxUI(); 
+            driveAccessToken = '';
+            driveFileId = null;
+            updateToolboxUI();
             showToast("Logout Berhasil");
         }, t('logout'));
     }
@@ -2087,26 +2126,26 @@
             const queryStr = encodeURIComponent("name='quran_sync.json'");
             const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${queryStr}`, { headers: { 'Authorization': 'Bearer ' + driveAccessToken } });
             if (!searchRes.ok) throw new Error("Gagal mencari file di Google Drive");
-            
+
             const searchData = await searchRes.json();
             let remoteData = { bookmarks: [], folders: [], lastRead: null, settings: null };
 
             if (searchData.files?.length > 0) {
-                driveFileId = searchData.files[0].id; 
+                driveFileId = searchData.files[0].id;
                 Storage.setString('quran_drive_file_id', driveFileId);
                 const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, { headers: { 'Authorization': 'Bearer ' + driveAccessToken } });
-                
+
                 if (fileRes.ok) {
                     const text = await fileRes.text();
                     if (text?.trim() !== "") {
                         try {
                             let parsedData = JSON.parse(text);
-                            remoteData.bookmarks = parsedData.bookmarks || []; 
+                            remoteData.bookmarks = parsedData.bookmarks || [];
                             remoteData.folders = parsedData.folders || [];
-                            remoteData.lastRead = parsedData.lastRead || null; 
+                            remoteData.lastRead = parsedData.lastRead || null;
                             remoteData.settings = parsedData.settings || null;
-                        } catch (e) { 
-                            console.error("Format JSON file di GDrive tidak valid.", e); 
+                        } catch (e) {
+                            console.error("Format JSON file di GDrive tidak valid.", e);
                         }
                     }
                 }
@@ -2131,30 +2170,30 @@
                 if (!appSettings.timestamp || (remoteData.settings.timestamp > appSettings.timestamp)) {
                     appSettings = { ...appSettings, ...remoteData.settings };
                     Storage.setJson('quran_settings', appSettings);
-                    applySettingsToUI(); 
-                    applyUILanguage(); 
+                    applySettingsToUI();
+                    applyUILanguage();
                     applySettings();
                 }
             }
 
             saveBookmarks();
-            if ($('home-view').classList.contains('active')) { 
-                renderSurahList(); 
-                renderJuzList(); 
-                renderBookmarkTab(); 
+            if ($('home-view').classList.contains('active')) {
+                renderSurahList();
+                renderJuzList();
+                renderBookmarkTab();
             }
             if (currentViewingFolderId) {
                 const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
-                if (folder) openFolderView(folder.id, folder.name); 
+                if (folder) openFolderView(folder.id, folder.name);
                 else closeFolderView();
             }
 
             await uploadToDriveRobust({ bookmarks: appBookmarks, folders: appFolders, lastRead: appLastRead, settings: appSettings });
             const now = new Date();
             const timeString = now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-            Storage.setString('quran_last_sync', timeString); 
+            Storage.setString('quran_last_sync', timeString);
             updateToolboxUI();
-            
+
             if (!isSilent) showToast(t('sync_success'));
         } catch (error) {
             console.error("Sync error:", error);
@@ -2180,12 +2219,12 @@
     async function uploadToDriveRobust(dataObj) {
         const metadata = { name: 'quran_sync.json' };
         if (!driveFileId) metadata.parents = ['appDataFolder'];
-        
+
         const boundary = '-------314159265358979323846';
         const delimiter = "\r\n--" + boundary + "\r\n";
         const closeDelim = "\r\n--" + boundary + "--";
         const body = delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(dataObj) + closeDelim;
-        
+
         const url = driveFileId ? `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=multipart` : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
 
         const res = await fetch(url, {
@@ -2193,13 +2232,13 @@
             headers: { 'Authorization': 'Bearer ' + driveAccessToken, 'Content-Type': `multipart/related; boundary=${boundary}` },
             body: body
         });
-        
+
         if (!res.ok) throw new Error(`Upload ditolak oleh server (HTTP ${res.status})`);
-        
+
         const resData = await res.json();
-        if (!driveFileId && resData.id) { 
-            driveFileId = resData.id; 
-            Storage.setString('quran_drive_file_id', driveFileId); 
+        if (!driveFileId && resData.id) {
+            driveFileId = resData.id;
+            Storage.setString('quran_drive_file_id', driveFileId);
         }
     }
 
@@ -2208,50 +2247,50 @@
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url; 
+        a.href = url;
         a.download = `quran_backup_${new Date().toISOString().slice(0,10)}.json`;
-        a.click(); 
+        a.click();
         URL.revokeObjectURL(url);
     }
 
     function importDataJson(event) {
         const file = event.target.files[0];
         if (!file) return;
-        
+
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
                 const importedData = JSON.parse(e.target.result);
                 appBookmarks = mergeSyncData(appBookmarks, importedData.bookmarks || []);
                 appFolders = mergeSyncData(appFolders, importedData.folders || []);
-                
+
                 if (importedData.lastRead?.timestamp) {
                     if (!appLastRead?.timestamp || importedData.lastRead.timestamp > appLastRead.timestamp) {
                         appLastRead = importedData.lastRead;
                     }
                 }
-                
+
                 if (importedData.settings?.timestamp) {
                     if (!appSettings.timestamp || importedData.settings.timestamp > appSettings.timestamp) {
                         appSettings = { ...appSettings, ...importedData.settings };
                         Storage.setJson('quran_settings', appSettings);
-                        applySettingsToUI(); 
-                        applyUILanguage(); 
+                        applySettingsToUI();
+                        applyUILanguage();
                         applySettings();
                     }
                 }
-                
+
                 saveBookmarks();
                 if ($('home-view').classList.contains('active')) renderBookmarkTab();
-                
+
                 if (currentViewingFolderId) {
                     const folder = appFolders.find(f => f.id === currentViewingFolderId && !f.deleted);
-                    if (folder) openFolderView(folder.id, folder.name); 
+                    if (folder) openFolderView(folder.id, folder.name);
                     else closeFolderView();
                 }
                 showToast(t('import_success'));
             } catch (err) {
-                console.error("Import Error", err); 
+                console.error("Import Error", err);
                 showToast(t('import_failed'));
             }
             event.target.value = '';
@@ -2272,24 +2311,24 @@
         if (handle) startDragItem(e, handle.dataset.id, handle.dataset.type);
     }, { passive: true });
 
-    document.addEventListener('touchstart', e => { 
-        pwaTouchStartX = e.touches[0].clientX; 
-        pwaTouchStartY = e.touches[0].clientY; 
+    document.addEventListener('touchstart', e => {
+        pwaTouchStartX = e.touches[0].clientX;
+        pwaTouchStartY = e.touches[0].clientY;
     }, { passive: true });
-    
+
     document.addEventListener('touchmove', e => {
-        const diffX = e.touches[0].clientX - pwaTouchStartX; 
+        const diffX = e.touches[0].clientX - pwaTouchStartX;
         const diffY = e.touches[0].clientY - pwaTouchStartY;
-        
+
         if (Math.abs(diffX) > Math.abs(diffY)) {
-            if (pwaTouchStartX < 20 || pwaTouchStartX > window.innerWidth - 20) { 
-                if (e.cancelable) e.preventDefault(); 
+            if (pwaTouchStartX < 20 || pwaTouchStartX > window.innerWidth - 20) {
+                if (e.cancelable) e.preventDefault();
             }
         } else {
             if (diffY > 0) {
                 const scrollable = e.target.closest('.tab-pane, .slide-card, .sheet-content, #surah-info-content, .edit-words-container, .move-folder-list, .goto-list, .verse-popup-translation-container, #last-read-history-list');
-                if (!scrollable || scrollable.scrollTop <= 0) { 
-                    if (e.cancelable) e.preventDefault(); 
+                if (!scrollable || scrollable.scrollTop <= 0) {
+                    if (e.cancelable) e.preventDefault();
                 }
             }
         }
@@ -2298,10 +2337,10 @@
     // =========================================
     // 17. INITIALIZATION CALL & SERVICE WORKER
     // =========================================
-    window.addEventListener('resize', () => { 
-        if ($('quran-view').classList.contains('active')) updateQuranUI(); 
+    window.addEventListener('resize', () => {
+        if ($('quran-view').classList.contains('active')) updateQuranUI();
     });
-    
+
     document.addEventListener('DOMContentLoaded', initApp);
 
     if ('serviceWorker' in navigator) {
