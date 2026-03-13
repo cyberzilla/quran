@@ -1,7 +1,7 @@
 /**
  * Al-Qur'an Digital App Script
  * Refactored: Modern, Clean, Reusable, & Encapsulated (IIFE)
- * Fitur: Fullscreen, Wake Lock, Juz Limit 2 Kata, Info Juz Terlokalisasi, Integrasi name_en untuk Surah
+ * Fitur: Fullscreen, Wake Lock, Juz Limit 2 Kata, name_en, & Info Sisa Hal Juz/Surah
  */
 (function (window, document) {
     'use strict';
@@ -107,7 +107,8 @@
             logout: "Keluar", import_success: "Data berhasil diimpor!", import_failed: "Format file impor tidak valid.",
             empty_folder_name: "Nama folder tidak boleh kosong!",
             keep_screen_on: "Layar Tetap Menyala", fullscreen_mode: "Mode Layar Penuh",
-            rem_pages: "Sisa {n} hal ke Juz {j}", start_juz: "Awal Juz {j}", last_juz: "Juz Terakhir"
+            rem_pages: "{n} hal ke Juz {j}", start_juz: "Awal Juz {j}", last_juz: "Juz Terakhir",
+            rem_pages_surah: "{n} hal ke {s}", start_surah: "Awal Surah {s}", last_surah: "Surah Terakhir"
         },
         en: {
             tab_surah: "Surah", tab_juz: "Juz", tab_library: "Library",
@@ -145,7 +146,8 @@
             logout: "Sign Out", import_success: "Data imported successfully!", import_failed: "Invalid import file format.",
             empty_folder_name: "Folder name cannot be empty!",
             keep_screen_on: "Keep Screen On", fullscreen_mode: "Fullscreen Mode",
-            rem_pages: "{n} pages to Juz {j}", start_juz: "Start of Juz {j}", last_juz: "Last Juz"
+            rem_pages: "{n} pages to Juz {j}", start_juz: "Start of Juz {j}", last_juz: "Last Juz",
+            rem_pages_surah: "{n} pages to {s}", start_surah: "Start of Surah {s}", last_surah: "Last Surah"
         }
     };
 
@@ -1698,6 +1700,7 @@
         }, 150);
     }
 
+    // UPDATE: TAMPILKAN SISA HALAMAN MENUJU JUZ BERIKUTNYA & SURAH BERIKUTNYA
     function updateQuranUI() {
         let headerText = `${t('page')} ${currentPage}`;
         let headerParts = [];
@@ -1727,7 +1730,7 @@
             const surahString = headerParts.join(' | ');
             const juzString = Array.from(juzSet).join('-');
 
-            // Logika Sisa Halaman ke Juz Berikutnya (Terjemahan Dinamis)
+            // 1. Logika Sisa Halaman ke Juz Berikutnya (Terjemahan Dinamis)
             let remainingPagesText = '';
             const maxJuz = Math.max(...Array.from(juzSet));
 
@@ -1749,7 +1752,39 @@
                 remainingPagesText = ` • ${t('last_juz')}`;
             }
 
-            headerText = `<span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem;">${surahString}</span><span style="display: block; font-size: 0.65rem; font-weight: 600; color: var(--text-muted); margin-top: 2px;">${juzString ? t('juz') + ' ' + juzString : ''}${remainingPagesText}</span>`;
+            // 2. Logika Sisa Halaman ke Surah Berikutnya (Terjemahan Dinamis)
+            let remainingSurahText = '';
+            const surahKeys = Object.keys(surahGroups).map(Number);
+            const maxSurah = Math.max(...surahKeys);
+
+            if (maxSurah && maxSurah < 114) {
+                const nextSurahQuery = execQuery(`SELECT v.page_number, s.name_latin FROM verses v LEFT JOIN surah s ON v.surah_number = s.id WHERE v.surah_number = ${maxSurah + 1} ORDER BY v.id ASC LIMIT 1`);
+                if (nextSurahQuery.length > 0) {
+                    const nextSurahPage = nextSurahQuery[0].page_number;
+                    const remainingPagesSurah = nextSurahPage - currentPage;
+                    const nextSurahName = nextSurahQuery[0].name_latin;
+
+                    if (remainingPagesSurah > 0) {
+                        let txt = t('rem_pages_surah').replace('{n}', remainingPagesSurah).replace('{s}', nextSurahName);
+                        remainingSurahText = ` • ${txt}`;
+                    } else if (remainingPagesSurah === 0) {
+                        let txt = t('start_surah').replace('{s}', nextSurahName);
+                        remainingSurahText = ` • ${txt}`;
+                    }
+                }
+            } else if (maxSurah === 114) {
+                remainingSurahText = ` • ${t('last_surah')}`;
+            }
+
+            // Gabungkan Teks ke dalam Header
+            headerText = `
+                <span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem;">
+                    ${surahString}
+                </span>
+                <span style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem; font-weight: 600; color: var(--text-muted); margin-top: 2px;">
+                    ${juzString ? t('juz') + ' ' + juzString : ''}${remainingPagesText}${remainingSurahText}
+                </span>
+            `;
         }
 
         $('quran-header-title').innerHTML = headerText;
