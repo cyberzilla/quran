@@ -1,7 +1,7 @@
 /**
  * Al-Qur'an Digital App Script
  * Refactored: Modern, Clean, Reusable, & Encapsulated (IIFE)
- * Fitur: Fullscreen, Wake Lock, Juz Limit 2 Kata, name_en, & Info Sisa Hal Juz/Surah
+ * Fitur: Fullscreen, Wake Lock, Juz Limit 2 Kata, name_en, & Info Sisa Hal Juz/Surah, Optimized GDrive Sync
  */
 (function (window, document) {
     'use strict';
@@ -66,6 +66,7 @@
     let driveAccessToken = '';
     let tokenClient;
     let driveFileId = localStorage.getItem('quran_drive_file_id') || null;
+    let syncTimeout = null; // Debounce timer untuk Auto Sync
 
     // =========================================
     // 2. KAMUS LOKALISASI (i18n Dictionary)
@@ -685,9 +686,7 @@
         renderBookmarkTab();
         showToast(t('folder_deleted'));
 
-        if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
-            performSync(true);
-        }
+        triggerAutoSync(); // MENGGUNAKAN AUTO SYNC
     }
 
     function promptDeleteFolder(id) {
@@ -720,9 +719,7 @@
 
         $$('.highlighted').forEach(el => el.classList.remove('highlighted'));
 
-        if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
-            performSync(true);
-        }
+        triggerAutoSync(); // MENGGUNAKAN AUTO SYNC
     }
 
     function renderBookmarkTab() {
@@ -1449,9 +1446,7 @@
             }
         }
 
-        if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
-            performSync(true);
-        }
+        triggerAutoSync(); // MENGGUNAKAN AUTO SYNC
     }
 
     // =========================================
@@ -1700,7 +1695,6 @@
         }, 150);
     }
 
-    // UPDATE: TAMPILKAN SISA HALAMAN MENUJU JUZ BERIKUTNYA & SURAH BERIKUTNYA
     function updateQuranUI() {
         let headerText = `${t('page')} ${currentPage}`;
         let headerParts = [];
@@ -1992,9 +1986,7 @@
             renderBookmarkTab();
         }
 
-        if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
-            performSync(true);
-        }
+        triggerAutoSync(); // MENGGUNAKAN AUTO SYNC
     }
 
     function loadSettings() {
@@ -2073,6 +2065,19 @@
     // =========================================
     // 15. GOOGLE DRIVE SYNC MODULE
     // =========================================
+
+    // Fungsi Debouncer untuk Sinkronisasi Otomatis
+    function triggerAutoSync() {
+        if (Storage.getString('quran_gdrive_linked') === 'true' && checkAndRestoreToken()) {
+            if (syncTimeout) clearTimeout(syncTimeout);
+
+            // Tunggu 3 detik setelah aktivitas pengguna terakhir, baru lakukan sync
+            syncTimeout = setTimeout(() => {
+                performSync(true);
+            }, 3000);
+        }
+    }
+
     function initGoogleSync() {
         if (typeof google === 'undefined') {
             setTimeout(initGoogleSync, 500);
@@ -2158,16 +2163,28 @@
 
     async function performSync(isSilent = false) {
         try {
-            const queryStr = encodeURIComponent("name='quran_sync.json'");
-            const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${queryStr}`, { headers: { 'Authorization': 'Bearer ' + driveAccessToken } });
-            if (!searchRes.ok) throw new Error("Gagal mencari file di Google Drive");
-
-            const searchData = await searchRes.json();
             let remoteData = { bookmarks: [], folders: [], lastRead: null, settings: null };
 
-            if (searchData.files?.length > 0) {
-                driveFileId = searchData.files[0].id;
-                Storage.setString('quran_drive_file_id', driveFileId);
+            // 1. CEK FILE ID LOKAL DULU (Lewati Search API jika sudah punya ID)
+            if (!driveFileId) {
+                driveFileId = Storage.getString('quran_drive_file_id');
+            }
+
+            if (!driveFileId) {
+                // Jika benar-benar belum punya ID, baru lakukan pencarian (Search API)
+                const queryStr = encodeURIComponent("name='quran_sync.json'");
+                const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${queryStr}`, { headers: { 'Authorization': 'Bearer ' + driveAccessToken } });
+                if (!searchRes.ok) throw new Error("Gagal mencari file di Google Drive");
+
+                const searchData = await searchRes.json();
+                if (searchData.files?.length > 0) {
+                    driveFileId = searchData.files[0].id;
+                    Storage.setString('quran_drive_file_id', driveFileId);
+                }
+            }
+
+            // 2. DOWNLOAD DATA DARI CLOUD
+            if (driveFileId) {
                 const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, { headers: { 'Authorization': 'Bearer ' + driveAccessToken } });
 
                 if (fileRes.ok) {
@@ -2183,9 +2200,14 @@
                             console.error("Format JSON file di GDrive tidak valid.", e);
                         }
                     }
+                } else if (fileRes.status === 404) {
+                    // File ID ada tapi file sudah dihapus di Drive, reset ID agar di-create ulang
+                    driveFileId = null;
+                    Storage.remove('quran_drive_file_id');
                 }
             }
 
+            // 3. MERGE DATA
             appBookmarks = mergeSyncData(appBookmarks, remoteData.bookmarks);
             appFolders = mergeSyncData(appFolders, remoteData.folders);
 
@@ -2212,6 +2234,7 @@
             }
 
             saveBookmarks();
+
             if ($('home-view').classList.contains('active')) {
                 renderSurahList();
                 renderJuzList();
@@ -2223,7 +2246,9 @@
                 else closeFolderView();
             }
 
+            // 4. UPLOAD KEMBALI KE DRIVE
             await uploadToDriveRobust({ bookmarks: appBookmarks, folders: appFolders, lastRead: appLastRead, settings: appSettings });
+
             const now = new Date();
             const timeString = now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
             Storage.setString('quran_last_sync', timeString);
@@ -2232,6 +2257,7 @@
             if (!isSilent) showToast(t('sync_success'));
         } catch (error) {
             console.error("Sync error:", error);
+            // Jika auto-sync dan file belum terinisialisasi, tahan notifikasi yang mengganggu
             if (!isSilent) showToast(t('sync_failed') + error.message);
         }
     }
@@ -2324,6 +2350,8 @@
                     else closeFolderView();
                 }
                 showToast(t('import_success'));
+
+                triggerAutoSync(); // Auto Sync setelah melakukan Import Lokal
             } catch (err) {
                 console.error("Import Error", err);
                 showToast(t('import_failed'));
@@ -2396,7 +2424,7 @@
         promptDeleteFolder, promptRemoveBookmark, executeConfirmModal, closeConfirmModal,
         openMoveModal, closeMoveModal, executeMoveBookmark,
         openEditWordsModal, closeEditWordsModal, saveEditWords, toggleWordHidden,
-        openLastReadHistory, closeLastReadHistory,
+        openLastReadHistory, closeLastReadHistory, triggerAutoSync,
         openQuranPage, closeQuran, changePage, openGoToPopup, closeGoToPopup, executeGoTo,
         selectGoToSurah, selectGoToAyah, selectGoToPage, openSurahInfoModal, closeSurahInfoModal,
         togglePopupTranslation, copyVerseText, addBookmark, setLastRead, handleVerseClick
