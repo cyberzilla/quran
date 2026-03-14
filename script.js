@@ -2079,6 +2079,11 @@
     }
 
     function initGoogleSync() {
+        if (window.AndroidBridge) {
+            updateToolboxUI();
+            return;
+        }
+
         if (typeof google === 'undefined') {
             setTimeout(initGoogleSync, 500);
             return;
@@ -2133,6 +2138,12 @@
     }
 
     function handleAuthClick() {
+        if (window.AndroidBridge) {
+            showToast(t('auth_google'));
+            window.AndroidBridge.startGoogleLogin();
+            return;
+        }
+
         if (!tokenClient) {
             showToast(t('sync_not_ready'));
             return;
@@ -2150,6 +2161,13 @@
             tokenClient.requestAccessToken();
         }
     }
+
+    window.onNativeLoginSuccess = function(email, name) {
+        Storage.setString('quran_sync_email', email);
+        Storage.setString('quran_gdrive_linked', 'true');
+        updateToolboxUI();
+        showToast(t('sync_success') + " " + name);
+    };
 
     function handleLogout() {
         showConfirm(t('logout_prompt_title'), t('logout_prompt_msg'), () => {
@@ -2427,7 +2445,8 @@
         openLastReadHistory, closeLastReadHistory, triggerAutoSync,
         openQuranPage, closeQuran, changePage, openGoToPopup, closeGoToPopup, executeGoTo,
         selectGoToSurah, selectGoToAyah, selectGoToPage, openSurahInfoModal, closeSurahInfoModal,
-        togglePopupTranslation, copyVerseText, addBookmark, setLastRead, handleVerseClick
+        togglePopupTranslation, copyVerseText, addBookmark, setLastRead, handleVerseClick,
+        onNativeLoginSuccess
     });
 
 })(window, document);
