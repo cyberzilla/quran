@@ -2162,11 +2162,26 @@
         }
     }
 
-    window.onNativeLoginSuccess = function(email, name) {
+    window.onNativeLoginSuccess = function(email, name, token) {
+        console.log("Login sukses dari Android:", email);
+
         Storage.setString('quran_sync_email', email);
         Storage.setString('quran_gdrive_linked', 'true');
-        updateToolboxUI();
-        showToast(t('sync_success') + " " + name);
+
+        if (token) {
+            driveAccessToken = token;
+
+            const expiryTime = Date.now() + 3500000;
+            Storage.setString('quran_gdrive_token', token);
+            Storage.setString('quran_gdrive_token_expiry', expiryTime.toString());
+
+            updateToolboxUI();
+            showToast("Halo " + name + "! Memulai sinkronisasi...");
+
+            performSync();
+        } else {
+            showToast("Gagal mendapatkan akses token Google Drive.");
+        }
     };
 
     function handleLogout() {
