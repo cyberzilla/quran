@@ -109,7 +109,8 @@
             empty_folder_name: "Nama folder tidak boleh kosong!",
             keep_screen_on: "Layar Tetap Menyala", fullscreen_mode: "Mode Layar Penuh",
             rem_pages: "{n} hal ke Juz {j}", start_juz: "Awal Juz {j}", last_juz: "Juz Terakhir",
-            rem_pages_surah: "{n} hal ke {s}", start_surah: "Awal Surah {s}", last_surah: "Surah Terakhir"
+            rem_pages_surah: "{n} hal ke {s}", start_surah: "Awal Surah {s}", last_surah: "Surah Terakhir",
+            press_again_to_exit: "Tekan sekali lagi untuk keluar" // KAMUS BARU
         },
         en: {
             tab_surah: "Surah", tab_juz: "Juz", tab_library: "Library",
@@ -148,7 +149,8 @@
             empty_folder_name: "Folder name cannot be empty!",
             keep_screen_on: "Keep Screen On", fullscreen_mode: "Fullscreen Mode",
             rem_pages: "{n} pages to Juz {j}", start_juz: "Start of Juz {j}", last_juz: "Last Juz",
-            rem_pages_surah: "{n} pages to {s}", start_surah: "Start of Surah {s}", last_surah: "Last Surah"
+            rem_pages_surah: "{n} pages to {s}", start_surah: "Start of Surah {s}", last_surah: "Last Surah",
+            press_again_to_exit: "Press back again to exit" // KAMUS BARU
         }
     };
 
@@ -306,6 +308,11 @@
         $$('[data-i18n]').forEach(el => el.innerText = t(el.getAttribute('data-i18n')));
         $$('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.getAttribute('data-i18n-placeholder')));
         updateToolboxUI();
+
+        // FUNGSI BARU: Kirim terjemahan Toast "Tekan lagi untuk keluar" ke Android Bridge
+        if (window.AndroidBridge && window.AndroidBridge.setExitToastMessage) {
+            window.AndroidBridge.setExitToastMessage(t('press_again_to_exit'));
+        }
     }
 
     // =========================================
@@ -2139,7 +2146,7 @@
 
     function handleAuthClick() {
         if (window.AndroidBridge) {
-            showToast(t('auth_google'));
+            // Toast "Meminta akses..." dihapus di Android, PWA yang handle
             window.AndroidBridge.startGoogleLogin();
             return;
         }
@@ -2162,23 +2169,26 @@
         }
     }
 
-    window.onNativeLoginSuccess = function(email, name, token) {
-        console.log("Login sukses dari Android:", email);
-
+    // Callback dari Android Bridge ketika berhasil login
+    window.onNativeLoginSuccess = function(email, name, photoUrl, token) {
         Storage.setString('quran_sync_email', email);
         Storage.setString('quran_gdrive_linked', 'true');
 
+        // Simpan avatar URL ke storage jika ada isinya
+        if (photoUrl && photoUrl.trim() !== "") {
+            Storage.setString('quran_sync_avatar', photoUrl);
+        }
+
         if (token) {
             driveAccessToken = token;
-
             const expiryTime = Date.now() + 3500000;
             Storage.setString('quran_gdrive_token', token);
             Storage.setString('quran_gdrive_token_expiry', expiryTime.toString());
 
             updateToolboxUI();
-            showToast("Halo " + name + "! Memulai sinkronisasi...");
+            showToast(t('sync_success') + " " + name);
 
-            performSync();
+            performSync(); // Langsung sync
         } else {
             showToast("Gagal mendapatkan akses token Google Drive.");
         }
