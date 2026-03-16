@@ -2348,13 +2348,21 @@
 
     function exportDataJson() {
         const data = { bookmarks: appBookmarks, folders: appFolders, lastRead: appLastRead, settings: appSettings };
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `quran_backup_${new Date().toISOString().slice(0,10)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+
+        const jsonString = JSON.stringify(data, null, 2);
+        const fileName = `quran_backup_${new Date().toISOString().slice(0,10)}.json`;
+
+        if (window.AndroidBridge && typeof window.AndroidBridge.exportBackup === "function") {
+            window.AndroidBridge.exportBackup(jsonString, fileName);
+        } else {
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
     }
 
     function importDataJson(event) {
