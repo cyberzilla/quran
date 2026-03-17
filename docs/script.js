@@ -151,7 +151,7 @@
             keep_screen_on: "Keep Screen On", fullscreen_mode: "Fullscreen Mode",
             rem_pages: "{n} pages to Juz {j}", start_juz: "Start of Juz {j}", last_juz: "Last Juz",
             rem_pages_surah: "{n} pages to {s}", start_surah: "Start of Surah {s}", last_surah: "Last Surah",
-            press_again_to_exit: "Press back again to exit", about_app: "About App", app_version: "Version",hello:"Halo"
+            press_again_to_exit: "Press back again to exit", about_app: "About App", app_version: "Version",hello:"Hello"
         }
     };
 
