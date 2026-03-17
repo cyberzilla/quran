@@ -111,7 +111,7 @@
             keep_screen_on: "Layar Tetap Menyala", fullscreen_mode: "Mode Layar Penuh",
             rem_pages: "{n} hal ke Juz {j}", start_juz: "Awal Juz {j}", last_juz: "Juz Terakhir",
             rem_pages_surah: "{n} hal ke {s}", start_surah: "Awal Surah {s}", last_surah: "Surah Terakhir",
-            press_again_to_exit: "Tekan sekali lagi untuk keluar", about_app: "Tentang Aplikasi", app_version: "Versi"
+            press_again_to_exit: "Tekan sekali lagi untuk keluar", about_app: "Tentang Aplikasi", app_version: "Versi",hello:"Halo"
         },
         en: {
             tab_surah: "Surah", tab_juz: "Juz", tab_library: "Library",
@@ -151,7 +151,7 @@
             keep_screen_on: "Keep Screen On", fullscreen_mode: "Fullscreen Mode",
             rem_pages: "{n} pages to Juz {j}", start_juz: "Start of Juz {j}", last_juz: "Last Juz",
             rem_pages_surah: "{n} pages to {s}", start_surah: "Start of Surah {s}", last_surah: "Last Surah",
-            press_again_to_exit: "Press back again to exit", about_app: "About App", app_version: "Version"
+            press_again_to_exit: "Press back again to exit", about_app: "About App", app_version: "Version",hello:"Halo"
         }
     };
 
@@ -2288,7 +2288,7 @@
             Storage.setString('quran_gdrive_token_expiry', expiryTime.toString());
 
             updateToolboxUI();
-            showToast(t('sync_success') + " " + name);
+            showToast(t('hello') + " " + name + ", " + t('syncing').toLowerCase());
 
             performSync(); // Langsung sync
         } else {
