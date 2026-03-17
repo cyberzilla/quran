@@ -148,22 +148,29 @@
                     <div class="verse-popup-subtitle" id="vp-subtitle">Ayat</div>
                 </div>
                 <div class="verse-popup-actions">
-                    <button id="vp-btn-translate" class="verse-popup-btn" onclick="togglePopupTranslation()">
+                    <button id="vp-btn-transliteration" class="verse-popup-btn" onclick="togglePopupTransliteration()" title="Transliterasi">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+                    </button>
+                    <button id="vp-btn-translate" class="verse-popup-btn" onclick="togglePopupTranslation()" title="Terjemahan">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7M9 3v2c0 4.418-2.239 8-5 8"/><path d="M5 9c0 2.144 2.952 3.908 6.7 4"/><path d="M12 20l4-9 4 9"/><path d="M19.1 18h-6.2"/></svg>
                     </button>
-                    <button id="vp-btn-copy" class="verse-popup-btn" onclick="copyVerseText()">
+                    <button id="vp-btn-copy" class="verse-popup-btn" onclick="copyVerseText()" title="Salin">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                     </button>
-                    <button id="vp-btn-bookmark" class="verse-popup-btn" onclick="addBookmark()">
+                    <button id="vp-btn-bookmark" class="verse-popup-btn" onclick="addBookmark()" title="Bookmark">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                     </button>
-                    <button id="vp-btn-lastread" class="verse-popup-btn" onclick="setLastRead()">
+                    <button id="vp-btn-lastread" class="verse-popup-btn" onclick="setLastRead()" title="Tandai Terakhir Dibaca">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
                     </button>
                 </div>
             </div>
-            <div id="vp-translation-container" class="verse-popup-translation-container">
-                <div id="vp-translation-text" class="verse-popup-translation-text"></div>
+
+            <div id="vp-transliteration-container" class="verse-popup-text-container">
+                <div id="vp-transliteration-text" class="verse-popup-text vp-translit-text"></div>
+            </div>
+            <div id="vp-translation-container" class="verse-popup-text-container">
+                <div id="vp-translation-text" class="verse-popup-text"></div>
             </div>
         </div>
     </div>
@@ -180,7 +187,7 @@
                     <option value="en">English</option>
                 </select>
             </div>
-            
+
             <div class="setting-item">
                 <span data-i18n="fullscreen_mode" style="font-weight: 500; color: var(--text-main); font-size: 0.75rem;">Mode Layar Penuh</span>
                 <label class="switch">
@@ -229,6 +236,29 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
                 </div>
+            </div>
+
+            <div class="setting-item" style="cursor: pointer; justify-content: flex-start; gap: 10px; border-top: 1px solid var(--border-color); margin-top: 10px; padding-top: 15px;" onclick="openAboutModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <span data-i18n="about_app" style="font-weight: 600; color: var(--text-main); font-size: 0.75rem;">Tentang Aplikasi</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-container" id="about-modal">
+        <div class="modal-box" style="text-align: center;">
+            <img id="about-app-icon" src="" alt="App Icon" style="width: 72px; height: 72px; border-radius: 16px; margin: 0 auto 10px; display: block; object-fit: cover;">
+            <h3 class="modal-title" id="about-app-name" style="margin-bottom: 5px;">Al-Qur'an Digital</h3>
+            <p id="about-app-version" style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 15px; font-weight: 500;"></p>
+            <p id="about-app-desc" style="font-size: 0.75rem; color: var(--text-main); margin-bottom: 20px; line-height: 1.5;"></p>
+
+            <a href="https://github.com/cyberzilla/quran" target="_blank" style="display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; background: var(--bg-body); border-radius: 8px; color: var(--text-main); text-decoration: none; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border-color); margin-bottom: 15px; transition: background 0.2s;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+                GitHub
+            </a>
+
+            <div class="modal-actions">
+                <button class="btn-primary" style="width: 100%;" onclick="closeAboutModal()" data-i18n="close">Tutup</button>
             </div>
         </div>
     </div>

@@ -1,7 +1,7 @@
 /**
  * Al-Qur'an Digital App Script
  * Refactored: Modern, Clean, Reusable, & Encapsulated (IIFE)
- * Fitur: Fullscreen, Wake Lock, Juz Limit 2 Kata, name_en, & Info Sisa Hal Juz/Surah, Optimized GDrive Sync
+ * Fitur: Fullscreen, Wake Lock, Juz Limit 2 Kata, name_en, Info Sisa Hal Juz/Surah, Optimized GDrive Sync, Contextual Go To
  */
 (function (window, document) {
     'use strict';
@@ -45,6 +45,7 @@
 
     // State UI & Modal
     let keepTranslationExpanded = false;
+    let keepTransliterationExpanded = false;
     let toastTimeout = null;
     let activeVerseData = null;
     let currentViewingFolderId = null;
@@ -110,7 +111,7 @@
             keep_screen_on: "Layar Tetap Menyala", fullscreen_mode: "Mode Layar Penuh",
             rem_pages: "{n} hal ke Juz {j}", start_juz: "Awal Juz {j}", last_juz: "Juz Terakhir",
             rem_pages_surah: "{n} hal ke {s}", start_surah: "Awal Surah {s}", last_surah: "Surah Terakhir",
-            press_again_to_exit: "Tekan sekali lagi untuk keluar" // KAMUS BARU
+            press_again_to_exit: "Tekan sekali lagi untuk keluar", about_app: "Tentang Aplikasi", app_version: "Versi"
         },
         en: {
             tab_surah: "Surah", tab_juz: "Juz", tab_library: "Library",
@@ -150,7 +151,7 @@
             keep_screen_on: "Keep Screen On", fullscreen_mode: "Fullscreen Mode",
             rem_pages: "{n} pages to Juz {j}", start_juz: "Start of Juz {j}", last_juz: "Last Juz",
             rem_pages_surah: "{n} pages to {s}", start_surah: "Start of Surah {s}", last_surah: "Last Surah",
-            press_again_to_exit: "Press back again to exit" // KAMUS BARU
+            press_again_to_exit: "Press back again to exit", about_app: "About App", app_version: "Version"
         }
     };
 
@@ -708,6 +709,7 @@
             surahId: activeVerseData.surahId,
             verseId: activeVerseData.verseId,
             pageNumber: activeVerseData.pageNumber,
+            juzNumber: activeVerseData.juzNumber, // Penambahan Juz
             surahName: activeVerseData.surahName,
             timestamp: Date.now()
         };
@@ -736,6 +738,15 @@
         if (appLastRead?.items?.length > 0) {
             if (titleLastRead) titleLastRead.style.display = 'block';
             let latest = appLastRead.items[0];
+
+            // Mengambil informasi Juz (apabila belum ada di data yang lama)
+            let juz = latest.juzNumber;
+            if (!juz && db) {
+                const jData = execQuery(`SELECT juz_number FROM verses WHERE surah_number=${latest.surahId} AND verse_number=${latest.verseId}`);
+                if (jData.length > 0) juz = jData[0].juz_number;
+            }
+            let juzInfo = juz ? ` • ${t('juz')} ${juz}` : '';
+
             const svgIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
             const svgHistory = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
 
@@ -744,7 +755,7 @@
                     <div class="item-number" style="background:var(--primary-light); color:var(--primary);">${svgIcon}</div>
                     <div class="item-info">
                         <div class="item-title">${latest.surahName}</div>
-                        <div class="item-subtitle">${t('ayah')} ${latest.verseId} • ${t('page')} ${latest.pageNumber} <br> <span style="font-size:0.55rem; color:var(--primary); font-weight:600;">${Utils.getTimeAgo(latest.timestamp)}</span></div>
+                        <div class="item-subtitle">${t('ayah')} ${latest.verseId} • ${t('page')} ${latest.pageNumber}${juzInfo} <br> <span style="font-size:0.55rem; color:var(--primary); font-weight:600;">${Utils.getTimeAgo(latest.timestamp)}</span></div>
                     </div>
                     <div class="action-group">
                         <button class="action-btn" onclick="event.stopPropagation(); openLastReadHistory()">${svgHistory}</button>
@@ -832,11 +843,19 @@
         let html = '';
         if (appLastRead?.items) {
             appLastRead.items.forEach(lr => {
+                let juzInfo = '';
+                if (lr.juzNumber) {
+                    juzInfo = ` • ${t('juz')} ${lr.juzNumber}`;
+                } else if (db) {
+                    const jData = execQuery(`SELECT juz_number FROM verses WHERE surah_number=${lr.surahId} AND verse_number=${lr.verseId}`);
+                    if (jData.length > 0) juzInfo = ` • ${t('juz')} ${jData[0].juz_number}`;
+                }
+
                 html += `
                     <div class="list-item" style="border-left: 3px solid var(--primary);" onclick="closeLastReadHistory(); openQuranPage(${lr.pageNumber}, ${lr.surahId}, ${lr.verseId}, 'lastread')">
                         <div class="item-info">
                             <div class="item-title">${lr.surahName} : ${lr.verseId}</div>
-                            <div class="item-subtitle">${t('page')} ${lr.pageNumber}</div>
+                            <div class="item-subtitle">${t('page')} ${lr.pageNumber}${juzInfo}</div>
                         </div>
                         <div style="font-size:0.6rem; color:var(--text-muted); text-align:right;">${Utils.getTimeAgo(lr.timestamp)}</div>
                     </div>
@@ -849,6 +868,34 @@
     function closeLastReadHistory() {
         $('last-read-history-modal').classList.remove('active');
     }
+
+    // --- Modal Tentang Aplikasi ---
+    async function openAboutModal() {
+        try {
+            const res = await fetch('manifest.json');
+            if (res.ok) {
+                const manifest = await res.json();
+                $('about-app-name').innerText = manifest.name || "Al-Qur'an Digital";
+                $('about-app-desc').innerText = manifest.description || "Aplikasi Al-Qur'an Digital Progressive Web App (PWA).";
+                if (manifest.icons && manifest.icons.length > 0) {
+                    // Ambil ikon yang paling memadai
+                    $('about-app-icon').src = manifest.icons[manifest.icons.length - 1].src;
+                } else {
+                    $('about-app-icon').src = 'icon-192.png';
+                }
+                $('about-app-version').innerText = manifest.version ? `${t('app_version')} ${manifest.version}` : `${t('app_version')} 1.0.0`;
+            }
+        } catch (e) {
+            console.error("Gagal memuat manifest", e);
+            $('about-app-icon').src = 'icon-192.png'; // Fallback icon
+        }
+        $('about-modal').classList.add('active');
+    }
+
+    function closeAboutModal() {
+        $('about-modal').classList.remove('active');
+    }
+    // ------------------------------
 
     function openFolderModal(folderId = null) {
         editingFolderId = folderId;
@@ -1131,14 +1178,24 @@
 
     function openGoToPopup() {
         $('goto-modal').classList.add('active');
-        const currentSurahData = execQuery(`SELECT surah_number FROM verses WHERE page_number = ${currentPage} LIMIT 1`);
 
-        if (currentSurahData.length > 0) {
-            gotoData.surah = currentSurahData[0].surah_number;
+        if (activeVerseData) {
+            // Jika ada ayat yang sedang terseleksi/di-highlight
+            gotoData.surah = activeVerseData.surahId;
+            gotoData.ayah = activeVerseData.verseId;
+            gotoData.page = activeVerseData.pageNumber;
+        } else {
+            // Jika tidak ada yang terseleksi, ambil ayat pertama dari halaman saat ini
+            const currentSurahData = execQuery(`SELECT surah_number, verse_number FROM verses WHERE page_number = ${currentPage} ORDER BY id ASC LIMIT 1`);
+            if (currentSurahData.length > 0) {
+                gotoData.surah = currentSurahData[0].surah_number;
+                gotoData.ayah = currentSurahData[0].verse_number;
+                gotoData.page = currentPage;
+            }
         }
 
         populateGoToSurah();
-        updateGoToAyahAndPage(gotoData.surah);
+        updateGoToAyahAndPage(gotoData.surah, gotoData.ayah);
     }
 
     function closeGoToPopup() {
@@ -1477,26 +1534,56 @@
         setupQuranTouchEvents();
     }
 
-    function applyTranslationState() {
+    function applyPopupState() {
         const popup = $('verse-popup');
-        const translateBtn = $('vp-btn-translate');
-        const transContainer = $('vp-translation-text');
+        const transBtn = $('vp-btn-translate');
+        const transContainer = $('vp-translation-container');
+        const transText = $('vp-translation-text');
 
-        if (keepTranslationExpanded && activeVerseData) {
-            let text = activeVerseData.translationText.replace(/&quot;/g, '"').replace(/\\'/g, "'");
-            transContainer.innerHTML = Utils.formatTranslation(text) || t('no_translation');
+        const translitBtn = $('vp-btn-transliteration');
+        const translitContainer = $('vp-transliteration-container');
+        const translitText = $('vp-transliteration-text');
+
+        if ((keepTranslationExpanded || keepTransliterationExpanded) && activeVerseData) {
+
+            if (keepTranslationExpanded) {
+                let text = activeVerseData.translationText.replace(/&quot;/g, '"').replace(/\\'/g, "'");
+                if(transText) transText.innerHTML = Utils.formatTranslation(text) || t('no_translation');
+                if(transBtn) transBtn.classList.add('active-btn');
+                if(transContainer) transContainer.classList.add('active');
+            } else {
+                if(transBtn) transBtn.classList.remove('active-btn');
+                if(transContainer) transContainer.classList.remove('active');
+            }
+
+            if (keepTransliterationExpanded) {
+                let text = activeVerseData.transliterationText.replace(/&quot;/g, '"').replace(/\\'/g, "'");
+                if(translitText) translitText.innerHTML = text || t('data_not_found');
+                if(translitBtn) translitBtn.classList.add('active-btn');
+                if(translitContainer) translitContainer.classList.add('active');
+            } else {
+                if(translitBtn) translitBtn.classList.remove('active-btn');
+                if(translitContainer) translitContainer.classList.remove('active');
+            }
+
             popup.classList.add('expanded');
-            if (translateBtn) translateBtn.classList.add('active-btn');
         } else {
             popup.classList.remove('expanded');
-            if (translateBtn) translateBtn.classList.remove('active-btn');
+            if(transBtn) transBtn.classList.remove('active-btn');
+            if(translitBtn) translitBtn.classList.remove('active-btn');
+            if(transContainer) transContainer.classList.remove('active');
+            if(translitContainer) translitContainer.classList.remove('active');
+
             setTimeout(() => {
-                if (!popup.classList.contains('expanded')) transContainer.innerHTML = "";
+                if (!popup.classList.contains('expanded')) {
+                    if(transText) transText.innerHTML = "";
+                    if(translitText) translitText.innerHTML = "";
+                }
             }, 400);
         }
     }
 
-    function handleVerseClick(surahId, verseId, pageNumber, surahName, arabicText, translationText, element) {
+    function handleVerseClick(surahId, verseId, pageNumber, juzNumber, surahName, arabicText, translationText, transliterationText, element) {
         if (preventNextClick) return;
 
         const popup = $('verse-popup');
@@ -1504,10 +1591,10 @@
 
         if (element.classList.contains('highlighted') && window._currentClickAction == null) {
             if (!isPopupActive) {
-                activeVerseData = { surahId, verseId, pageNumber, surahName, arabicText, translationText };
+                activeVerseData = { surahId, verseId, pageNumber, juzNumber, surahName, arabicText, translationText, transliterationText };
                 $('vp-title').innerText = surahName;
                 $('vp-subtitle').innerText = `${t('ayah')} ${verseId}`;
-                applyTranslationState();
+                applyPopupState();
                 popup.classList.add('active');
                 return;
             } else {
@@ -1519,14 +1606,14 @@
 
         $$('.highlighted').forEach(el => el.classList.remove('highlighted'));
         element.classList.add('highlighted');
-        activeVerseData = { surahId, verseId, pageNumber, surahName, arabicText, translationText };
+        activeVerseData = { surahId, verseId, pageNumber, juzNumber, surahName, arabicText, translationText, transliterationText };
 
         if (window._currentClickAction === 'bookmark' || window._currentClickAction === 'lastread') {
             closeVersePopup();
         } else {
             $('vp-title').innerText = surahName;
             $('vp-subtitle').innerText = `${t('ayah')} ${verseId}`;
-            applyTranslationState();
+            applyPopupState();
             popup.classList.add('active');
         }
     }
@@ -1534,17 +1621,31 @@
     function togglePopupTranslation() {
         if (!activeVerseData) return;
         keepTranslationExpanded = !keepTranslationExpanded;
-        applyTranslationState();
+        applyPopupState();
+    }
+
+    function togglePopupTransliteration() {
+        if (!activeVerseData) return;
+        keepTransliterationExpanded = !keepTransliterationExpanded;
+        applyPopupState();
     }
 
     function closeVersePopup() {
         const popup = $('verse-popup');
         if (popup) {
             popup.classList.remove('active', 'expanded');
-            $('vp-btn-translate').classList.remove('active-btn');
+            if($('vp-btn-translate')) $('vp-btn-translate').classList.remove('active-btn');
+            if($('vp-btn-transliteration')) $('vp-btn-transliteration').classList.remove('active-btn');
+            if($('vp-translation-container')) $('vp-translation-container').classList.remove('active');
+            if($('vp-transliteration-container')) $('vp-transliteration-container').classList.remove('active');
+
             keepTranslationExpanded = false;
+            keepTransliterationExpanded = false;
             setTimeout(() => {
-                if (!popup.classList.contains('expanded')) $('vp-translation-text').innerHTML = "";
+                if (!popup.classList.contains('expanded')) {
+                    if($('vp-translation-text')) $('vp-translation-text').innerHTML = "";
+                    if($('vp-transliteration-text')) $('vp-transliteration-text').innerHTML = "";
+                }
             }, 400);
         }
         activeVerseData = null;
@@ -1622,12 +1723,13 @@
             const cleanArabicForCopy = textForCopy.replace(/'/g, "\\'").replace(/"/g, "&quot;");
             const selectedTranslationText = appSettings.appLanguage === 'en' ? v.translation_en : v.translation_id;
             const cleanTranslationForCopy = (selectedTranslationText || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            const cleanTransliterationForCopy = (v.transliteration || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
             const verseElId = `verse-wrap-${v.surah_number}-${v.verse_number}`;
 
             if (isMushafMode) {
-                html += `<span id="${verseElId}" class="verse-mushaf-wrap" onclick="handleVerseClick(${v.surah_number}, ${v.verse_number}, ${pageNumber}, '${safeSurahName}', '${cleanArabicForCopy}', '${cleanTranslationForCopy}', this)"><span class="verse-word">${fullArabicText}</span></span> `;
+                html += `<span id="${verseElId}" class="verse-mushaf-wrap" onclick="handleVerseClick(${v.surah_number}, ${v.verse_number}, ${pageNumber}, ${v.juz_number}, '${safeSurahName}', '${cleanArabicForCopy}', '${cleanTranslationForCopy}', '${cleanTransliterationForCopy}', this)"><span class="verse-word">${fullArabicText}</span></span> `;
             } else {
-                html += `<div id="${verseElId}" class="verse-container" onclick="handleVerseClick(${v.surah_number}, ${v.verse_number}, ${pageNumber}, '${safeSurahName}', '${cleanArabicForCopy}', '${cleanTranslationForCopy}', this)">`;
+                html += `<div id="${verseElId}" class="verse-container" onclick="handleVerseClick(${v.surah_number}, ${v.verse_number}, ${pageNumber}, ${v.juz_number}, '${safeSurahName}', '${cleanArabicForCopy}', '${cleanTranslationForCopy}', '${cleanTransliterationForCopy}', this)">`;
                 if (appSettings.wordByWord) {
                     html += `<div class="wbw-container">`;
                     let arWords = [], trWords = [], tlWords = [];
@@ -2440,7 +2542,7 @@
             }
         } else {
             if (diffY > 0) {
-                const scrollable = e.target.closest('.tab-pane, .slide-card, .sheet-content, #surah-info-content, .edit-words-container, .move-folder-list, .goto-list, .verse-popup-translation-container, #last-read-history-list');
+                const scrollable = e.target.closest('.tab-pane, .slide-card, .sheet-content, #surah-info-content, .edit-words-container, .move-folder-list, .goto-list, .verse-popup-text-container, #last-read-history-list');
                 if (!scrollable || scrollable.scrollTop <= 0) {
                     if (e.cancelable) e.preventDefault();
                 }
@@ -2478,7 +2580,8 @@
         openLastReadHistory, closeLastReadHistory, triggerAutoSync,
         openQuranPage, closeQuran, changePage, openGoToPopup, closeGoToPopup, executeGoTo,
         selectGoToSurah, selectGoToAyah, selectGoToPage, openSurahInfoModal, closeSurahInfoModal,
-        togglePopupTranslation, copyVerseText, addBookmark, setLastRead, handleVerseClick,
+        togglePopupTranslation, togglePopupTransliteration, openAboutModal, closeAboutModal,
+        copyVerseText, addBookmark, setLastRead, handleVerseClick,
         onNativeLoginSuccess
     });
 
