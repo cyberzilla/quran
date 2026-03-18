@@ -1,7 +1,7 @@
 /**
  * Al-Qur'an Digital App Script
  * Refactored: Modern, Clean, Reusable, & Encapsulated (IIFE)
- * Fitur: Fullscreen, Wake Lock, Juz Limit 2 Kata, name_en, Info Sisa Hal Juz/Surah, Optimized GDrive Sync, Contextual Go To
+ * Fitur: Fullscreen, Wake Lock, Juz Limit 2 Kata, name_en, Info Sisa Hal Juz/Surah, Optimized GDrive Sync, Contextual Go To, Full i18n
  */
 (function (window, document) {
     'use strict';
@@ -74,7 +74,7 @@
     // =========================================
     const i18n = {
         id: {
-            tab_surah: "Surah", tab_juz: "Juz", tab_library: "Library",
+            hello: "Halo", tab_surah: "Surah", tab_juz: "Juz", tab_library: "Library",
             search_placeholder: "Cari Surah, Terjemahan...", loading_assets: "MEMUAT ASET FONT...",
             loading_db_engine: "MEMUAT MESIN DATABASE...", downloading_db: "MENGUNDUH DATA AL-QUR'AN...",
             loading_local_db: "MEMUAT DATABASE LOKAL...", db_failed: "GAGAL MEMUAT DATABASE",
@@ -107,14 +107,15 @@
             history_title: "Riwayat Terakhir Dibaca", login_sync: "Login untuk Sync",
             logout_prompt_title: "Keluar Akun", logout_prompt_msg: "Apakah Anda yakin ingin memutuskan sinkronisasi Google Drive?",
             logout: "Keluar", import_success: "Data berhasil diimpor!", import_failed: "Format file impor tidak valid.",
+            export_success: "Berhasil menyimpan backup data!", export_failed: "Gagal menyimpan backup.",
             empty_folder_name: "Nama folder tidak boleh kosong!",
             keep_screen_on: "Layar Tetap Menyala", fullscreen_mode: "Mode Layar Penuh",
             rem_pages: "{n} hal ke Juz {j}", start_juz: "Awal Juz {j}", last_juz: "Juz Terakhir",
             rem_pages_surah: "{n} hal ke {s}", start_surah: "Awal Surah {s}", last_surah: "Surah Terakhir",
-            press_again_to_exit: "Tekan sekali lagi untuk keluar", about_app: "Tentang Aplikasi", app_version: "Versi",hello:"Halo"
+            press_again_to_exit: "Tekan sekali lagi untuk keluar", about_app: "Tentang Aplikasi", app_version: "Versi"
         },
         en: {
-            tab_surah: "Surah", tab_juz: "Juz", tab_library: "Library",
+            hello: "Hello", tab_surah: "Surah", tab_juz: "Juz", tab_library: "Library",
             search_placeholder: "Search Surah, Translation...", loading_assets: "LOADING FONT ASSETS...",
             loading_db_engine: "LOADING DATABASE ENGINE...", downloading_db: "DOWNLOADING QURAN DATA...",
             loading_local_db: "LOADING LOCAL DATABASE...", db_failed: "FAILED TO LOAD DATABASE",
@@ -147,11 +148,12 @@
             history_title: "Last Read History", login_sync: "Login to Sync",
             logout_prompt_title: "Sign Out", logout_prompt_msg: "Are you sure you want to disconnect Google Drive synchronization?",
             logout: "Sign Out", import_success: "Data imported successfully!", import_failed: "Invalid import file format.",
+            export_success: "Backup saved successfully!", export_failed: "Failed to save backup.",
             empty_folder_name: "Folder name cannot be empty!",
             keep_screen_on: "Keep Screen On", fullscreen_mode: "Fullscreen Mode",
             rem_pages: "{n} pages to Juz {j}", start_juz: "Start of Juz {j}", last_juz: "Last Juz",
             rem_pages_surah: "{n} pages to {s}", start_surah: "Start of Surah {s}", last_surah: "Last Surah",
-            press_again_to_exit: "Press back again to exit", about_app: "About App", app_version: "Version",hello:"Hello"
+            press_again_to_exit: "Press back again to exit", about_app: "About App", app_version: "Version"
         }
     };
 
@@ -310,7 +312,6 @@
         $$('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.getAttribute('data-i18n-placeholder')));
         updateToolboxUI();
 
-        // FUNGSI BARU: Kirim terjemahan Toast "Tekan lagi untuk keluar" ke Android Bridge
         if (window.AndroidBridge && window.AndroidBridge.setExitToastMessage) {
             window.AndroidBridge.setExitToastMessage(t('press_again_to_exit'));
         }
@@ -2288,9 +2289,11 @@
             Storage.setString('quran_gdrive_token_expiry', expiryTime.toString());
 
             updateToolboxUI();
+
+            // Menggunakan i18n penuh dengan pesan "Halo [Nama], menyinkronkan data..."
             showToast(t('hello') + " " + name + ", " + t('syncing').toLowerCase());
 
-            performSync(); // Langsung sync
+            performSync(); // Toast "Sinkronisasi Berhasil" akan otomatis muncul setelah fungsi ini selesai
         } else {
             showToast("Gagal mendapatkan akses token Google Drive.");
         }
@@ -2298,10 +2301,22 @@
 
     function handleLogout() {
         showConfirm(t('logout_prompt_title'), t('logout_prompt_msg'), () => {
+            // 1. Hapus semua data token di Local Storage PWA
             ['quran_gdrive_linked', 'quran_gdrive_token', 'quran_gdrive_token_expiry', 'quran_sync_email', 'quran_sync_avatar', 'quran_last_sync', 'quran_drive_file_id'].forEach(k => Storage.remove(k));
             driveAccessToken = '';
             driveFileId = null;
             updateToolboxUI();
+
+            // 2. Perintahkan Android Native untuk menghapus sesi Google Sign-In
+            if (window.AndroidBridge && typeof window.AndroidBridge.signOutGoogle === 'function') {
+                window.AndroidBridge.signOutGoogle();
+            }
+
+            // 3. (Opsional) Jika diakses murni via Web Browser, revoke token
+            if (!window.AndroidBridge && typeof google !== 'undefined') {
+                google.accounts.oauth2.revoke(driveAccessToken, () => { console.log("Token revoked"); });
+            }
+
             showToast("Logout Berhasil");
         }, t('logout'));
     }
@@ -2455,7 +2470,10 @@
         const fileName = `quran_backup_${new Date().toISOString().slice(0,10)}.json`;
 
         if (window.AndroidBridge && typeof window.AndroidBridge.exportBackup === "function") {
-            window.AndroidBridge.exportBackup(jsonString, fileName);
+            const successMsg = t('export_success') || "Berhasil menyimpan backup";
+            const failMsg = t('export_failed') || "Gagal membuka penyimpanan";
+
+            window.AndroidBridge.exportBackup(jsonString, fileName, successMsg, failMsg);
         } else {
             const blob = new Blob([jsonString], { type: "application/json" });
             const url = URL.createObjectURL(blob);
